@@ -86,14 +86,14 @@ func (dto *WorkPackageDto) Convert() *models.WorkPackage {
 		if dto.Links.Version != nil {
 			wp.Version = dto.Links.Version.Title
 		}
+		if dto.Links.Parent != nil && dto.Links.Parent.Href != "" {
+			if id, err := strconv.ParseUint(path.Base(dto.Links.Parent.Href), 10, 64); err == nil {
+				wp.ParentId = id
+			}
+		}
 	}
 	if dto.Description != nil {
 		wp.Description = dto.Description.Raw
-	}
-	if dto.Links != nil && dto.Links.Parent != nil && dto.Links.Parent.Href != "" {
-		if id, err := strconv.ParseUint(path.Base(dto.Links.Parent.Href), 10, 64); err == nil {
-			wp.ParentId = id
-		}
 	}
 	return wp
 }
