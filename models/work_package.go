@@ -16,6 +16,7 @@ type WorkPackage struct {
 	UpdatedAt   string
 	StartDate   string
 	DueDate     string
+	ParentId    uint64
 }
 
 type WorkPackageCollection struct {

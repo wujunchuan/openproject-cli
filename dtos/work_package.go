@@ -1,6 +1,9 @@
 package dtos
 
 import (
+	"path"
+	"strconv"
+
 	"github.com/opf/openproject-cli/models"
 )
 
@@ -13,6 +16,7 @@ type WorkPackageLinksDto struct {
 	Type              *LinkDto   `json:"type,omitempty"`
 	Priority          *LinkDto   `json:"priority,omitempty"`
 	Version           *LinkDto   `json:"version,omitempty"`
+	Parent            *LinkDto   `json:"parent,omitempty"`
 	CustomActions     []*LinkDto `json:"customActions,omitempty"`
 	PrepareAttachment *LinkDto   `json:"prepareAttachment,omitempty"`
 }
@@ -85,6 +89,11 @@ func (dto *WorkPackageDto) Convert() *models.WorkPackage {
 	}
 	if dto.Description != nil {
 		wp.Description = dto.Description.Raw
+	}
+	if dto.Links != nil && dto.Links.Parent != nil && dto.Links.Parent.Href != "" {
+		if id, err := strconv.ParseUint(path.Base(dto.Links.Parent.Href), 10, 64); err == nil {
+			wp.ParentId = id
+		}
 	}
 	return wp
 }
