@@ -17,6 +17,9 @@ type KeyMap struct {
 	Open     key.Binding
 	Help     key.Binding
 	Quit     key.Binding
+	Tree     key.Binding
+	Expand   key.Binding
+	Collapse key.Binding
 }
 
 var DefaultKeyMap = KeyMap{
@@ -75,5 +78,17 @@ var DefaultKeyMap = KeyMap{
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
 		key.WithHelp("q", "quit"),
+	),
+	Tree: key.NewBinding(
+		key.WithKeys("t"),
+		key.WithHelp("t", "tree toggle"),
+	),
+	Expand: key.NewBinding(
+		key.WithKeys("right", ">"),
+		key.WithHelp(">/→", "expand"),
+	),
+	Collapse: key.NewBinding(
+		key.WithKeys("left", "<"),
+		key.WithHelp("</←", "collapse"),
 	),
 }
