@@ -12,6 +12,13 @@ import (
 	"github.com/opf/openproject-cli/components/resources/work_packages"
 )
 
+type filterState int
+
+const (
+	filterBrowseFields filterState = iota
+	filterPopup
+)
+
 type filterField struct {
 	name    string
 	options []string
@@ -24,6 +31,9 @@ type filterModel struct {
 	visible      bool
 	originalOpts map[work_packages.FilterOption]string
 	showHelp     bool
+	state        filterState
+	popupItems   []string
+	popupIndex   int
 }
 
 func newFilterModel() *filterModel {
@@ -74,28 +84,33 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 		return nil
 	}
 
+	if m.state == filterPopup {
+		return m.updatePopup(keyMsg)
+	}
+
+	// filterBrowseFields
 	switch keyMsg.String() {
 	case "?":
 		m.showHelp = !m.showHelp
-	case "tab":
+	case "tab", "l":
 		if !m.showHelp {
 			m.activeField = (m.activeField + 1) % len(m.fields)
 		}
-	case "shift+tab":
+	case "shift+tab", "h":
 		if !m.showHelp {
 			m.activeField--
 			if m.activeField < 0 {
 				m.activeField = len(m.fields) - 1
 			}
 		}
-	case "up":
+	case "up", "k":
 		if !m.showHelp {
 			field := &m.fields[m.activeField]
 			if field.current > 0 {
 				field.current--
 			}
 		}
-	case "down":
+	case "down", "j":
 		if !m.showHelp {
 			field := &m.fields[m.activeField]
 			if field.current < len(field.options)-1 {
@@ -108,8 +123,63 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 				m.fields[i].current = 0
 			}
 		}
+	case "enter":
+		if !m.showHelp {
+			m.openPopup()
+		}
 	}
 	return nil
+}
+
+func (m *filterModel) openPopup() {
+	field := m.fields[m.activeField]
+	m.popupItems = field.options
+	m.popupIndex = field.current
+	m.state = filterPopup
+}
+
+func (m *filterModel) updatePopup(keyMsg tea.KeyMsg) tea.Cmd {
+	switch keyMsg.String() {
+	case "up", "k":
+		if m.popupIndex > 0 {
+			m.popupIndex--
+		}
+	case "down", "j":
+		if m.popupIndex < len(m.popupItems)-1 {
+			m.popupIndex++
+		}
+	case "enter":
+		m.fields[m.activeField].current = m.popupIndex
+		m.state = filterBrowseFields
+		m.popupItems = nil
+	case "esc":
+		m.state = filterBrowseFields
+		m.popupItems = nil
+	}
+	return nil
+}
+
+func (m *filterModel) popupView() string {
+	var b strings.Builder
+	b.WriteString("\n")
+	field := m.fields[m.activeField]
+	b.WriteString(titleStyle.Render(field.name))
+	b.WriteString("\n\n")
+
+	for i, item := range m.popupItems {
+		prefix := "  "
+		if i == m.popupIndex {
+			prefix = "▸ "
+			b.WriteString(selectedItemStyle.Render(prefix + item))
+		} else {
+			b.WriteString(normalItemStyle.Render(prefix + item))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(helpStyle.Render("  j/k move  enter select  esc cancel"))
+	return b.String()
 }
 
 func (m *filterModel) FilterOptions() map[work_packages.FilterOption]string {
@@ -134,14 +204,19 @@ func (m *filterModel) FilterOptions() map[work_packages.FilterOption]string {
 func (m *filterModel) View() string {
 	if m.showHelp {
 		return helpOverlay("Filter — Key Bindings", [][2]string{
-			{"tab", "next field"},
-			{"shift+tab", "previous field"},
+			{"h / l", "previous / next field"},
+			{"j / k", "previous / next value"},
+			{"tab / shift+tab", "next / previous field"},
 			{"↑ / ↓", "cycle value"},
-			{"enter", "apply filters"},
-			{"esc", "cancel"},
+			{"enter", "open popup"},
+			{"esc", "cancel / close popup"},
 			{"c", "clear all filters"},
 			{"?", "toggle this help"},
 		}, 60)
+	}
+
+	if m.state == filterPopup {
+		return m.popupView()
 	}
 
 	var b strings.Builder
@@ -166,7 +241,7 @@ func (m *filterModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("  tab/shift+tab field  ↑↓ select  enter apply  esc cancel  c clear  ? help"))
+	b.WriteString(helpStyle.Render("  h/l field  j/k value  enter popup  esc cancel  c clear  ? help"))
 	return b.String()
 }
 
