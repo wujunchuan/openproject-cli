@@ -177,16 +177,7 @@ func BackToListCmd() tea.Cmd {
 	}
 }
 
-// Temporary stubs - will be replaced by list_view.go and detail_view.go
-type listModel struct{ searchActive bool }
-
-func newListModel() *listModel                                          { return &listModel{} }
-func (m *listModel) Init() tea.Cmd                                     { return func() tea.Msg { return nil } }
-func (m *listModel) SetSize(w, h int)                                  {}
-func (m *listModel) SetWorkPackages(c *models.WorkPackageCollection)   {}
-func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd)          { return m, nil }
-func (m *listModel) View() string                                      { return "" }
-
+// Temporary stubs - will be replaced by detail_view.go
 type detailModel struct{}
 
 func newDetailModel(wp *models.WorkPackage, w, h int) *detailModel { return &detailModel{} }
