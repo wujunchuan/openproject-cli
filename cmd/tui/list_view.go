@@ -179,7 +179,7 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 				m.selected++
 				m.ensureVisible()
 			}
-		case "enter":
+		case "enter", "l":
 			if m.selected >= 0 && m.selected < len(m.items) {
 				return m, OpenDetailCmd(m.items[m.selected])
 			}
@@ -277,16 +277,13 @@ func (m *listModel) sortItems() {
 func (m *listModel) View() string {
 	if m.showHelp {
 		return helpOverlay("List — Key Bindings", [][2]string{
-			{"↑ / k", "move up"},
-			{"↓ / j", "move down"},
-			{"enter", "open detail view"},
-			{"/", "search (client-side)"},
-			{"f", "open filter panel"},
-			{"s", "cycle sort (ID → Status → Type → Assignee)"},
-			{"n", "next page"},
-			{"p", "previous page"},
+			{"j / k", "move selection"},
+			{"enter / l", "open detail"},
+			{"c", "copy ID to clipboard"},
+			{"/", "search"},
+			{"f", "filter"},
+			{"s", "cycle sort"},
 			{"r", "refresh"},
-			{"o", "open in browser"},
 			{"?", "toggle this help"},
 			{"q", "quit"},
 		}, m.width)
@@ -397,7 +394,8 @@ func (m *listModel) View() string {
 
 	// Help bar
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("  ↑↓ move  enter select  / search  f filter  s sort  n/p page  r refresh  ? help  q quit"))
+	keys := []string{"j/k", "move", "enter/l", "open", "c", "copy", "/", "search", "f", "filter", "?", "help", "q", "quit"}
+	b.WriteString(helpStyle.Render("  " + strings.Join(keys, " ")))
 
 	return b.String()
 }

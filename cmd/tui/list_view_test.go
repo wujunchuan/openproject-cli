@@ -88,6 +88,28 @@ func TestListModelEnterOpensDetail(t *testing.T) {
 	}
 }
 
+func TestListModelLOpensDetail(t *testing.T) {
+	m := newListModel()
+	wp := &models.WorkPackage{Id: 99, Subject: "LKey"}
+	m.SetWorkPackages(&models.WorkPackageCollection{
+		Items: []*models.WorkPackage{wp},
+	})
+
+	_, cmd := m.Update(keyMsg("l"))
+	if cmd == nil {
+		t.Fatal("l should return a command")
+	}
+
+	msg := cmd()
+	detailMsg, ok := msg.(openDetailMsg)
+	if !ok {
+		t.Fatalf("expected openDetailMsg, got %T", msg)
+	}
+	if detailMsg.wp.Id != 99 {
+		t.Fatalf("expected wp id 99, got %d", detailMsg.wp.Id)
+	}
+}
+
 func TestSortCycle(t *testing.T) {
 	m := newListModel()
 	m.SetWorkPackages(&models.WorkPackageCollection{
