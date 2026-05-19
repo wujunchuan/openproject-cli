@@ -126,8 +126,14 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
 			if !m.filterOverlay && !m.searchActive && !m.showHelp {
 				row := m.mouseEventToRow(msg.Y)
-				if row >= 0 && row < len(m.items) {
-					m.selected = row
+				if m.treeMode {
+					if row >= 0 && row < len(m.flatNodes) {
+						m.selected = row
+					}
+				} else {
+					if row >= 0 && row < len(m.items) {
+						m.selected = row
+					}
 				}
 			}
 		}
@@ -572,7 +578,11 @@ func assigneeOrDash(s string) string {
 func (m *listModel) mouseEventToRow(y int) int {
 	offset := m.headerLines()
 	row := y - offset + m.scrollOffset
-	if row < 0 || row >= len(m.items) {
+	itemCount := len(m.items)
+	if m.treeMode {
+		itemCount = len(m.flatNodes)
+	}
+	if row < 0 || row >= itemCount {
 		return -1
 	}
 	return row
