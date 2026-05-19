@@ -31,7 +31,7 @@ func TestFilterModelValueSelection(t *testing.T) {
 		t.Fatalf("expected current=0, got %d", m.fields[1].current)
 	}
 
-	m.Update(keyMsg("down"))
+	m.Update(keyMsg("l"))
 	if m.fields[1].current != 1 {
 		t.Fatalf("expected current=1, got %d", m.fields[1].current)
 	}
@@ -62,29 +62,29 @@ func TestFilterModelHJKLNavigation(t *testing.T) {
 		t.Fatalf("expected activeField=0, got %d", m.activeField)
 	}
 
-	// l = next field
-	m.Update(keyMsg("l"))
-	if m.activeField != 1 {
-		t.Fatalf("expected activeField=1 after l, got %d", m.activeField)
-	}
-
-	// h = previous field
-	m.Update(keyMsg("h"))
-	if m.activeField != 0 {
-		t.Fatalf("expected activeField=0 after h, got %d", m.activeField)
-	}
-
-	// j = next value
-	m.activeField = 1 // Status: ["all", "open", "closed"]
+	// j = next field (down)
 	m.Update(keyMsg("j"))
-	if m.fields[1].current != 1 {
-		t.Fatalf("expected current=1 after j, got %d", m.fields[1].current)
+	if m.activeField != 1 {
+		t.Fatalf("expected activeField=1 after j, got %d", m.activeField)
 	}
 
-	// k = previous value
+	// k = previous field (up)
 	m.Update(keyMsg("k"))
+	if m.activeField != 0 {
+		t.Fatalf("expected activeField=0 after k, got %d", m.activeField)
+	}
+
+	// l = next value (right)
+	m.activeField = 1 // Status: ["all", "open", "closed"]
+	m.Update(keyMsg("l"))
+	if m.fields[1].current != 1 {
+		t.Fatalf("expected current=1 after l, got %d", m.fields[1].current)
+	}
+
+	// h = previous value (left)
+	m.Update(keyMsg("h"))
 	if m.fields[1].current != 0 {
-		t.Fatalf("expected current=0 after k, got %d", m.fields[1].current)
+		t.Fatalf("expected current=0 after h, got %d", m.fields[1].current)
 	}
 }
 

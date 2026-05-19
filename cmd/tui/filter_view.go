@@ -101,37 +101,29 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 	switch keyMsg.String() {
 	case "?":
 		m.showHelp = !m.showHelp
-	case "tab", "l":
+	case "tab", "down", "j":
 		if !m.showHelp {
-			if m.activeField == 3 {
-				m.cycleAssigneeRight()
-			} else {
-				m.activeField = (m.activeField + 1) % len(m.fields)
+			m.activeField = (m.activeField + 1) % len(m.fields)
+		}
+	case "shift+tab", "up", "k":
+		if !m.showHelp {
+			m.activeField--
+			if m.activeField < 0 {
+				m.activeField = len(m.fields) - 1
 			}
 		}
-	case "shift+tab", "h":
-		if !m.showHelp {
-			if m.activeField == 3 {
-				m.cycleAssigneeLeft()
-			} else {
-				m.activeField--
-				if m.activeField < 0 {
-					m.activeField = len(m.fields) - 1
-				}
-			}
-		}
-	case "up", "k":
-		if !m.showHelp {
-			field := &m.fields[m.activeField]
-			if field.current > 0 {
-				field.current--
-			}
-		}
-	case "down", "j":
+	case "right", "l":
 		if !m.showHelp {
 			field := &m.fields[m.activeField]
 			if field.current < len(field.options)-1 {
 				field.current++
+			}
+		}
+	case "left", "h":
+		if !m.showHelp {
+			field := &m.fields[m.activeField]
+			if field.current > 0 {
+				field.current--
 			}
 		}
 	case "c":
@@ -146,36 +138,6 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 		}
 	}
 	return nil
-}
-
-func (m *filterModel) cycleAssigneeRight() {
-	field := &m.fields[3]
-	if field.current == 0 {
-		// all -> me
-		field.current = 1
-	} else if field.current == 1 {
-		// me -> selected (first non-all/me option)
-		if len(field.options) > 2 {
-			field.current = 2
-		}
-	} else {
-		// selected -> all
-		field.current = 0
-	}
-}
-
-func (m *filterModel) cycleAssigneeLeft() {
-	field := &m.fields[3]
-	if field.current == 0 {
-		// all -> selected (last option)
-		field.current = len(field.options) - 1
-	} else if field.current == 1 {
-		// me -> all
-		field.current = 0
-	} else {
-		// selected -> me
-		field.current = 1
-	}
 }
 
 func (m *filterModel) openPopup() {
@@ -251,10 +213,10 @@ func (m *filterModel) FilterOptions() map[work_packages.FilterOption]string {
 func (m *filterModel) View() string {
 	if m.showHelp {
 		return helpOverlay("Filter — Key Bindings", [][2]string{
-			{"h / l", "previous / next field"},
-			{"j / k", "previous / next value"},
+			{"j / k", "next / previous field"},
+			{"h / l", "previous / next value"},
 			{"tab / shift+tab", "next / previous field"},
-			{"↑ / ↓", "cycle value"},
+			{"← / →", "change value"},
 			{"enter", "open popup"},
 			{"esc", "cancel / close popup"},
 			{"c", "clear all filters"},
@@ -288,7 +250,7 @@ func (m *filterModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("  h/l field  j/k value  enter popup  esc cancel  c clear  ? help"))
+	b.WriteString(helpStyle.Render("  j/k field  h/l value  enter popup  esc cancel  c clear  ? help"))
 	return b.String()
 }
 
