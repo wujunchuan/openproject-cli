@@ -71,3 +71,14 @@ func Search(input string) ([]*models.User, error) {
 	userCollection := parser.Parse[dtos.UserCollectionDto](response)
 	return userCollection.Convert(), nil
 }
+
+func All() ([]*models.User, error) {
+	query := requests.NewPaginatedQuery(-1, nil)
+	response, err := requests.Get(paths.Principals(), &query)
+	if err != nil {
+		return nil, err
+	}
+
+	userCollection := parser.Parse[dtos.UserCollectionDto](response)
+	return userCollection.Convert(), nil
+}
