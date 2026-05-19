@@ -38,3 +38,22 @@ func TestDetailModelSetActivities(t *testing.T) {
 		t.Fatal("should not be loading after SetActivities")
 	}
 }
+
+func TestDetailModelCCopiesId(t *testing.T) {
+	wp := &models.WorkPackage{Id: 200, Subject: "CopyDetail"}
+	m := newDetailModel(wp, 80, 24)
+
+	_, cmd := m.Update(keyMsg("c"))
+	if cmd == nil {
+		t.Fatal("c should return a command")
+	}
+
+	msg := cmd()
+	copyMsg, ok := msg.(copyIdMsg)
+	if !ok {
+		t.Fatalf("expected copyIdMsg, got %T", msg)
+	}
+	if copyMsg.id != 200 {
+		t.Fatalf("expected id 200, got %d", copyMsg.id)
+	}
+}

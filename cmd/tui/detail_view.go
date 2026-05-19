@@ -153,6 +153,10 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 			} else {
 				return m, BackToListCmd()
 			}
+		case "c":
+			return m, func() tea.Msg {
+				return copyIdMsg{id: m.wp.Id}
+			}
 		case "e":
 			m.editOverlay = true
 			m.edit = newEditModel(m.wp, m.width)
@@ -181,6 +185,7 @@ func (m *detailModel) View() string {
 			{"↑ / ↓", "scroll content"},
 			{"PgUp / PgDn", "scroll page"},
 			{"esc", "back to list"},
+			{"c", "copy ID to clipboard"},
 			{"e", "edit (type, start/due date)"},
 			{"o", "open in browser"},
 			{"r", "refresh"},
@@ -190,7 +195,7 @@ func (m *detailModel) View() string {
 	if m.editOverlay {
 		return m.edit.View()
 	}
-	footer := helpStyle.Render("  esc back  e edit  o browser  r refresh  ? help")
+	footer := helpStyle.Render("  esc back  c copy  e edit  o browser  r refresh  ? help")
 	return m.viewport.View() + "\n" + footer
 }
 
