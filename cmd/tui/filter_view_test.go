@@ -133,3 +133,34 @@ func TestFilterPopupCancel(t *testing.T) {
 		t.Fatalf("expected field unchanged, got %d", m.fields[1].current)
 	}
 }
+
+func TestFilterAssigneeModeToggle(t *testing.T) {
+	m := newFilterModel()
+	m.fields[3].options = []string{"all", "me", "John Smith", "Jane Doe"}
+	m.fields[3].current = 0 // all
+	m.activeField = 3
+
+	// l on Assignee: all -> me
+	m.Update(keyMsg("l"))
+	if m.fields[3].current != 1 {
+		t.Fatalf("expected current=1 (me), got %d", m.fields[3].current)
+	}
+
+	// l on Assignee: me -> first user (selected)
+	m.Update(keyMsg("l"))
+	if m.fields[3].current != 2 {
+		t.Fatalf("expected current=2 (selected), got %d", m.fields[3].current)
+	}
+
+	// h on Assignee: selected -> me
+	m.Update(keyMsg("h"))
+	if m.fields[3].current != 1 {
+		t.Fatalf("expected current=1 (me), got %d", m.fields[3].current)
+	}
+
+	// h on Assignee: me -> all
+	m.Update(keyMsg("h"))
+	if m.fields[3].current != 0 {
+		t.Fatalf("expected current=0 (all), got %d", m.fields[3].current)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/opf/openproject-cli/components/resources/projects"
 	"github.com/opf/openproject-cli/components/resources/status"
 	resTypes "github.com/opf/openproject-cli/components/resources/types"
+	"github.com/opf/openproject-cli/components/resources/users"
 	"github.com/opf/openproject-cli/components/resources/work_packages"
 )
 
@@ -42,7 +43,7 @@ func newFilterModel() *filterModel {
 			{name: "Project", options: []string{"all"}},
 			{name: "Status", options: []string{"all", "open", "closed"}},
 			{name: "Type", options: []string{"all"}},
-			{name: "Assignee", options: []string{"all", "me", "none"}},
+			{name: "Assignee", options: []string{"all", "me"}},
 		},
 		originalOpts: make(map[work_packages.FilterOption]string),
 	}
@@ -74,6 +75,14 @@ func (m *filterModel) loadOptions() tea.Cmd {
 			}
 		}
 
+		// Load users for assignee
+		if us, err := users.All(); err == nil {
+			m.fields[3].options = []string{"all", "me"}
+			for _, u := range us {
+				m.fields[3].options = append(m.fields[3].options, u.Name)
+			}
+		}
+
 		return nil
 	}
 }
@@ -94,13 +103,21 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 		m.showHelp = !m.showHelp
 	case "tab", "l":
 		if !m.showHelp {
-			m.activeField = (m.activeField + 1) % len(m.fields)
+			if m.activeField == 3 {
+				m.cycleAssigneeRight()
+			} else {
+				m.activeField = (m.activeField + 1) % len(m.fields)
+			}
 		}
 	case "shift+tab", "h":
 		if !m.showHelp {
-			m.activeField--
-			if m.activeField < 0 {
-				m.activeField = len(m.fields) - 1
+			if m.activeField == 3 {
+				m.cycleAssigneeLeft()
+			} else {
+				m.activeField--
+				if m.activeField < 0 {
+					m.activeField = len(m.fields) - 1
+				}
 			}
 		}
 	case "up", "k":
@@ -129,6 +146,36 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 		}
 	}
 	return nil
+}
+
+func (m *filterModel) cycleAssigneeRight() {
+	field := &m.fields[3]
+	if field.current == 0 {
+		// all -> me
+		field.current = 1
+	} else if field.current == 1 {
+		// me -> selected (first non-all/me option)
+		if len(field.options) > 2 {
+			field.current = 2
+		}
+	} else {
+		// selected -> all
+		field.current = 0
+	}
+}
+
+func (m *filterModel) cycleAssigneeLeft() {
+	field := &m.fields[3]
+	if field.current == 0 {
+		// all -> selected (last option)
+		field.current = len(field.options) - 1
+	} else if field.current == 1 {
+		// me -> all
+		field.current = 0
+	} else {
+		// selected -> me
+		field.current = 1
+	}
 }
 
 func (m *filterModel) openPopup() {
