@@ -171,3 +171,111 @@ func TestListModelCCopiesId(t *testing.T) {
 		t.Fatalf("expected id 107, got %d", copyMsg.id)
 	}
 }
+
+func TestTreeToggle(t *testing.T) {
+	m := newListModel()
+	m.SetWorkPackages(&models.WorkPackageCollection{
+		Total: 3,
+		Items: []*models.WorkPackage{
+			{Id: 1, Subject: "Parent"},
+			{Id: 2, Subject: "Child", ParentId: 1},
+			{Id: 3, Subject: "Root"},
+		},
+	})
+
+	if m.treeMode {
+		t.Fatal("treeMode should be false initially")
+	}
+
+	// Toggle to tree mode
+	m, _ = m.Update(keyMsg("t"))
+	if !m.treeMode {
+		t.Fatal("treeMode should be true after pressing t")
+	}
+	if len(m.flatNodes) != 3 {
+		t.Fatalf("expected 3 visible nodes (Parent, Child, Root), got %d", len(m.flatNodes))
+	}
+
+	// Toggle back to list mode
+	m, _ = m.Update(keyMsg("t"))
+	if m.treeMode {
+		t.Fatal("treeMode should be false after pressing t again")
+	}
+}
+
+func TestTreeExpandCollapse(t *testing.T) {
+	m := newListModel()
+	m.SetWorkPackages(&models.WorkPackageCollection{
+		Total: 2,
+		Items: []*models.WorkPackage{
+			{Id: 1, Subject: "Parent"},
+			{Id: 2, Subject: "Child", ParentId: 1},
+		},
+	})
+
+	// Enter tree mode
+	m, _ = m.Update(keyMsg("t"))
+
+	// Default: expanded, should see 2 nodes
+	if len(m.flatNodes) != 2 {
+		t.Fatalf("expected 2 visible nodes, got %d", len(m.flatNodes))
+	}
+
+	// Collapse the parent
+	m, _ = m.Update(keyMsg("<"))
+	if len(m.flatNodes) != 1 {
+		t.Fatalf("expected 1 visible node after collapse, got %d", len(m.flatNodes))
+	}
+
+	// Expand the parent
+	m, _ = m.Update(keyMsg(">"))
+	if len(m.flatNodes) != 2 {
+		t.Fatalf("expected 2 visible nodes after expand, got %d", len(m.flatNodes))
+	}
+}
+
+func TestTreeEnterOnLeafOpensDetail(t *testing.T) {
+	m := newListModel()
+	m.SetWorkPackages(&models.WorkPackageCollection{
+		Total: 2,
+		Items: []*models.WorkPackage{
+			{Id: 1, Subject: "Parent"},
+			{Id: 2, Subject: "Child", ParentId: 1},
+		},
+	})
+
+	m, _ = m.Update(keyMsg("t"))
+	// Move to child
+	m, _ = m.Update(keyMsg("down"))
+	// Enter on leaf should open detail
+	_, cmd := m.Update(keyMsg("enter"))
+	if cmd == nil {
+		t.Fatal("enter on leaf node should return a command")
+	}
+	msg := cmd()
+	detailMsg, ok := msg.(openDetailMsg)
+	if !ok {
+		t.Fatalf("expected openDetailMsg, got %T", msg)
+	}
+	if detailMsg.wp.Id != 2 {
+		t.Fatalf("expected wp id 2, got %d", detailMsg.wp.Id)
+	}
+}
+
+func TestTreeEnterOnParentTogglesExpand(t *testing.T) {
+	m := newListModel()
+	m.SetWorkPackages(&models.WorkPackageCollection{
+		Total: 2,
+		Items: []*models.WorkPackage{
+			{Id: 1, Subject: "Parent"},
+			{Id: 2, Subject: "Child", ParentId: 1},
+		},
+	})
+
+	m, _ = m.Update(keyMsg("t"))
+	// Enter on parent should toggle collapse
+	m, _ = m.Update(keyMsg("enter"))
+	if len(m.flatNodes) != 1 {
+		t.Fatalf("expected 1 node after collapsing, got %d", len(m.flatNodes))
+	}
+}
