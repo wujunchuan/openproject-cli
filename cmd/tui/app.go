@@ -74,7 +74,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q":
-			if a.state == listView && !a.list.searchActive {
+			if a.state == listView && !a.list.searchActive && !a.list.filterOverlay {
 				a.quitting = true
 				return a, tea.Quit
 			}

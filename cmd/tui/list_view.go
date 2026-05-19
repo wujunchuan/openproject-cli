@@ -14,20 +14,22 @@ import (
 )
 
 type listModel struct {
-	items        []*models.WorkPackage
-	selected     int
-	collection   *models.WorkPackageCollection
-	page         int
-	pageSize     int64
-	total        int64
-	width        int
-	height       int
-	loading      bool
-	spinner      spinner.Model
-	searchActive bool
-	searchInput  string
-	filterOpts   map[work_packages.FilterOption]string
-	sortField    sortField
+	items         []*models.WorkPackage
+	selected      int
+	collection    *models.WorkPackageCollection
+	page          int
+	pageSize      int64
+	total         int64
+	width         int
+	height        int
+	loading       bool
+	spinner       spinner.Model
+	searchActive  bool
+	searchInput   string
+	filterOpts    map[work_packages.FilterOption]string
+	sortField     sortField
+	filter        *filterModel
+	filterOverlay bool
 }
 
 func newListModel() *listModel {
@@ -40,6 +42,7 @@ func newListModel() *listModel {
 		page:       1,
 		spinner:    s,
 		filterOpts: make(map[work_packages.FilterOption]string),
+		filter:     newFilterModel(),
 	}
 }
 
@@ -87,6 +90,24 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Filter overlay handling
+		if m.filterOverlay {
+			switch msg.String() {
+			case "esc":
+				m.filterOverlay = false
+				return m, nil
+			case "enter":
+				m.filterOpts = m.filter.FilterOptions()
+				m.filterOverlay = false
+				m.loading = true
+				m.page = 1
+				return m, tea.Batch(m.spinner.Tick, m.loadWorkPackages)
+			default:
+				m.filter.Update(msg)
+				return m, nil
+			}
+		}
+
 		if m.searchActive {
 			switch msg.String() {
 			case "esc":
@@ -146,6 +167,9 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 			return m, tea.Batch(m.spinner.Tick, m.loadWorkPackages)
 		case "s":
 			m.cycleSort()
+		case "f":
+			m.filterOverlay = true
+			return m, m.filter.loadOptions()
 		}
 	}
 
@@ -209,6 +233,10 @@ func (m *listModel) sortItems() {
 }
 
 func (m *listModel) View() string {
+	if m.filterOverlay {
+		return m.filter.View()
+	}
+
 	var b strings.Builder
 
 	// Header
