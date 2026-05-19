@@ -9,6 +9,7 @@ import (
 type function[T any] func() (T, error)
 
 var loadingSpinner *spinner.Spinner
+var silent bool
 
 func init() {
 	loadingSpinner = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
@@ -16,12 +17,14 @@ func init() {
 	_ = loadingSpinner.Color("yellow")
 }
 
+func SetSilent(b bool) {
+	silent = b
+}
+
 func WithSpinner[T any](f function[T]) (T, error) {
-	loadingSpinner.Start()
-
-	t, err := f()
-
-	loadingSpinner.Stop()
-
-	return t, err
+	if !silent {
+		loadingSpinner.Start()
+		defer loadingSpinner.Stop()
+	}
+	return f()
 }
