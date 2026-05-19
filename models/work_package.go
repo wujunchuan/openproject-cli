@@ -8,6 +8,11 @@ type WorkPackage struct {
 	Status      string
 	Description string
 	LockVersion int
+	Priority    string
+	Project     string
+	Version     string
+	CreatedAt   string
+	UpdatedAt   string
 }
 
 type WorkPackageCollection struct {

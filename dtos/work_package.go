@@ -11,6 +11,8 @@ type WorkPackageLinksDto struct {
 	Project           *LinkDto   `json:"project,omitempty"`
 	Assignee          *LinkDto   `json:"assignee,omitempty"`
 	Type              *LinkDto   `json:"type,omitempty"`
+	Priority          *LinkDto   `json:"priority,omitempty"`
+	Version           *LinkDto   `json:"version,omitempty"`
 	CustomActions     []*LinkDto `json:"customActions,omitempty"`
 	PrepareAttachment *LinkDto   `json:"prepareAttachment,omitempty"`
 }
@@ -22,6 +24,8 @@ type WorkPackageDto struct {
 	Description *LongTextDto         `json:"description,omitempty"`
 	Embedded    *embeddedDto         `json:"_embedded,omitempty"`
 	LockVersion int                  `json:"lockVersion,omitempty"`
+	CreatedAt   string               `json:"createdAt,omitempty"`
+	UpdatedAt   string               `json:"updatedAt,omitempty"`
 }
 
 type embeddedDto struct {
@@ -48,15 +52,37 @@ type CreateWorkPackageDto struct {
 /////////////// MODEL CONVERSION ///////////////
 
 func (dto *WorkPackageDto) Convert() *models.WorkPackage {
-	return &models.WorkPackage{
+	wp := &models.WorkPackage{
 		Id:          uint64(dto.Id),
 		Subject:     dto.Subject,
-		Type:        dto.Links.Type.Title,
-		Assignee:    dto.Links.Assignee.Title,
-		Status:      dto.Links.Status.Title,
-		Description: dto.Description.Raw,
 		LockVersion: dto.LockVersion,
+		CreatedAt:   dto.CreatedAt,
+		UpdatedAt:   dto.UpdatedAt,
 	}
+	if dto.Links != nil {
+		if dto.Links.Type != nil {
+			wp.Type = dto.Links.Type.Title
+		}
+		if dto.Links.Assignee != nil {
+			wp.Assignee = dto.Links.Assignee.Title
+		}
+		if dto.Links.Status != nil {
+			wp.Status = dto.Links.Status.Title
+		}
+		if dto.Links.Priority != nil {
+			wp.Priority = dto.Links.Priority.Title
+		}
+		if dto.Links.Project != nil {
+			wp.Project = dto.Links.Project.Title
+		}
+		if dto.Links.Version != nil {
+			wp.Version = dto.Links.Version.Title
+		}
+	}
+	if dto.Description != nil {
+		wp.Description = dto.Description.Raw
+	}
+	return wp
 }
 
 func (dto *WorkPackageCollectionDto) Convert() *models.WorkPackageCollection {
