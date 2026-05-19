@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/opf/openproject-cli/components/configuration"
 	"github.com/opf/openproject-cli/models"
 )
 
@@ -36,6 +38,9 @@ type errorMsg struct {
 	err error
 }
 
+type copyConfirmMsg struct{}
+type copyClearMsg struct{}
+
 // --- App Model ---
 
 type App struct {
@@ -48,6 +53,7 @@ type App struct {
 	quitting     bool
 	ctrlCPressed bool
 	ctrlCTime    time.Time
+	copyConfirm  bool
 }
 
 func NewApp() App {
@@ -130,6 +136,24 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.state = listView
 		a.detail = nil
 		return a, nil
+
+	case copyIdMsg:
+		prefix := configuration.CopyPrefix()
+		text := fmt.Sprintf("%s#%d", prefix, msg.id)
+		if err := clipboard.WriteAll(text); err == nil {
+			return a, func() tea.Msg { return copyConfirmMsg{} }
+		}
+		return a, nil
+
+	case copyConfirmMsg:
+		a.copyConfirm = true
+		return a, tea.Tick(1500*time.Millisecond, func(t time.Time) tea.Msg {
+			return copyClearMsg{}
+		})
+
+	case copyClearMsg:
+		a.copyConfirm = false
+		return a, nil
 	}
 
 	switch a.state {
@@ -160,6 +184,10 @@ func (a App) View() string {
 	if a.err != nil {
 		content += "\n" + errorStyle.Render(fmt.Sprintf("Error: %v", a.err)) + "\n"
 		content += helpStyle.Render("  r to retry")
+	}
+
+	if a.copyConfirm {
+		content += "\n" + helpStyle.Render("  copied!")
 	}
 
 	return docStyle.Render(content)

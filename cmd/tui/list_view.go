@@ -210,6 +210,13 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 			if m.selected >= 0 && m.selected < len(m.items) {
 				_ = launch.Browser(routes.WorkPackageUrl(m.items[m.selected]))
 			}
+		case "c":
+			if !m.searchActive && !m.filterOverlay && len(m.items) > 0 {
+				selected := m.items[m.selected]
+				return m, func() tea.Msg {
+					return copyIdMsg{id: selected.Id}
+				}
+			}
 		}
 	}
 
@@ -474,4 +481,8 @@ func (m *listModel) ensureVisible() {
 	} else if m.selected >= m.scrollOffset+v {
 		m.scrollOffset = m.selected - v + 1
 	}
+}
+
+type copyIdMsg struct {
+	id uint64
 }

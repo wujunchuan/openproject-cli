@@ -149,3 +149,25 @@ func TestSortCycle(t *testing.T) {
 		t.Fatalf("expected first item id=1 after full cycle, got %d", m.items[0].Id)
 	}
 }
+
+func TestListModelCCopiesId(t *testing.T) {
+	m := newListModel()
+	wp := &models.WorkPackage{Id: 107, Subject: "Copy"}
+	m.SetWorkPackages(&models.WorkPackageCollection{
+		Items: []*models.WorkPackage{wp},
+	})
+
+	_, cmd := m.Update(keyMsg("c"))
+	if cmd == nil {
+		t.Fatal("c should return a command")
+	}
+
+	msg := cmd()
+	copyMsg, ok := msg.(copyIdMsg)
+	if !ok {
+		t.Fatalf("expected copyIdMsg, got %T", msg)
+	}
+	if copyMsg.id != 107 {
+		t.Fatalf("expected id 107, got %d", copyMsg.id)
+	}
+}
