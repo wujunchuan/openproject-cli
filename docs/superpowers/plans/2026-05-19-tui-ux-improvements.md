@@ -509,29 +509,29 @@ func TestFilterModelHJKLNavigation(t *testing.T) {
 		t.Fatalf("expected activeField=0, got %d", m.activeField)
 	}
 
-	// l = next field
-	m.Update(keyMsg("l"))
-	if m.activeField != 1 {
-		t.Fatalf("expected activeField=1 after l, got %d", m.activeField)
-	}
-
-	// h = previous field
-	m.Update(keyMsg("h"))
-	if m.activeField != 0 {
-		t.Fatalf("expected activeField=0 after h, got %d", m.activeField)
-	}
-
-	// j = next value
-	m.activeField = 1 // Status: ["all", "open", "closed"]
+	// j = next field (down)
 	m.Update(keyMsg("j"))
-	if m.fields[1].current != 1 {
-		t.Fatalf("expected current=1 after j, got %d", m.fields[1].current)
+	if m.activeField != 1 {
+		t.Fatalf("expected activeField=1 after j, got %d", m.activeField)
 	}
 
-	// k = previous value
+	// k = previous field (up)
 	m.Update(keyMsg("k"))
+	if m.activeField != 0 {
+		t.Fatalf("expected activeField=0 after k, got %d", m.activeField)
+	}
+
+	// l = next value (right)
+	m.activeField = 1 // Status: ["all", "open", "closed"]
+	m.Update(keyMsg("l"))
+	if m.fields[1].current != 1 {
+		t.Fatalf("expected current=1 after l, got %d", m.fields[1].current)
+	}
+
+	// h = previous value (left)
+	m.Update(keyMsg("h"))
 	if m.fields[1].current != 0 {
-		t.Fatalf("expected current=0 after k, got %d", m.fields[1].current)
+		t.Fatalf("expected current=0 after h, got %d", m.fields[1].current)
 	}
 }
 ```
@@ -555,29 +555,29 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 	switch keyMsg.String() {
 	case "?":
 		m.showHelp = !m.showHelp
-	case "tab", "l":
+	case "tab", "down", "j":
 		if !m.showHelp {
 			m.activeField = (m.activeField + 1) % len(m.fields)
 		}
-	case "shift+tab", "h":
+	case "shift+tab", "up", "k":
 		if !m.showHelp {
 			m.activeField--
 			if m.activeField < 0 {
 				m.activeField = len(m.fields) - 1
 			}
 		}
-	case "up", "k":
-		if !m.showHelp {
-			field := &m.fields[m.activeField]
-			if field.current > 0 {
-				field.current--
-			}
-		}
-	case "down", "j":
+	case "right", "l":
 		if !m.showHelp {
 			field := &m.fields[m.activeField]
 			if field.current < len(field.options)-1 {
 				field.current++
+			}
+		}
+	case "left", "h":
+		if !m.showHelp {
+			field := &m.fields[m.activeField]
+			if field.current > 0 {
+				field.current--
 			}
 		}
 	case "c":
@@ -635,10 +635,10 @@ Change `filterModel.View()` to:
 func (m *filterModel) View() string {
 	if m.showHelp {
 		return helpOverlay("Filter — Key Bindings", [][2]string{
-			{"h / l", "previous / next field"},
-			{"j / k", "previous / next value"},
+			{"j / k", "next / previous field"},
+			{"h / l", "previous / next value"},
 			{"tab / shift+tab", "next / previous field"},
-			{"↑ / ↓", "cycle value"},
+			{"← / →", "change value"},
 			{"enter", "open popup"},
 			{"esc", "cancel / close popup"},
 			{"c", "clear all filters"},
@@ -672,7 +672,7 @@ func (m *filterModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("  h/l field  j/k value  enter popup  esc cancel  c clear  ? help"))
+	b.WriteString(helpStyle.Render("  j/k field  h/l value  enter popup  esc cancel  c clear  ? help"))
 	return b.String()
 }
 ```
@@ -725,9 +725,9 @@ git commit -m "feat(tui): add hjkl navigation and popup overlay to filter view"
 - Modify: `cmd/tui/filter_view.go`
 - Modify: `cmd/tui/filter_view_test.go`
 
-- [ ] **Step 1: Update newFilterModel to load users for assignee**
+Note: With the corrected navigation model, h/l changes values for ALL fields. The assignee toggle works naturally since h/l cycles through `all → me → <user1> → <user2> → ...`. No special assignee-specific logic is needed beyond loading users into the options.
 
-No struct changes needed — the `current` index on `filterField` already tracks which option is selected. The assignee options will be `["all", "me", <user1>, <user2>, ...]`.
+- [ ] **Step 1: Update newFilterModel to load users for assignee**
 
 Update `newFilterModel` default:
 
@@ -761,12 +761,12 @@ if us, err := users.All(); err == nil {
 
 Add import: `"github.com/opf/openproject-cli/components/resources/users"`.
 
-- [ ] **Step 3: Add h/l assignee mode toggle test**
+- [ ] **Step 3: Add assignee value cycling test**
 
 In `cmd/tui/filter_view_test.go`, append:
 
 ```go
-func TestFilterAssigneeModeToggle(t *testing.T) {
+func TestFilterAssigneeValueCycling(t *testing.T) {
 	m := newFilterModel()
 	m.fields[3].options = []string{"all", "me", "John Smith", "Jane Doe"}
 	m.fields[3].current = 0 // all
@@ -778,13 +778,13 @@ func TestFilterAssigneeModeToggle(t *testing.T) {
 		t.Fatalf("expected current=1 (me), got %d", m.fields[3].current)
 	}
 
-	// l on Assignee: me -> first user (selected)
+	// l on Assignee: me -> John Smith
 	m.Update(keyMsg("l"))
 	if m.fields[3].current != 2 {
-		t.Fatalf("expected current=2 (selected), got %d", m.fields[3].current)
+		t.Fatalf("expected current=2 (John Smith), got %d", m.fields[3].current)
 	}
 
-	// h on Assignee: selected -> me
+	// h on Assignee: John Smith -> me
 	m.Update(keyMsg("h"))
 	if m.fields[3].current != 1 {
 		t.Fatalf("expected current=1 (me), got %d", m.fields[3].current)
@@ -795,91 +795,26 @@ func TestFilterAssigneeModeToggle(t *testing.T) {
 	if m.fields[3].current != 0 {
 		t.Fatalf("expected current=0 (all), got %d", m.fields[3].current)
 	}
-}
-```
 
-- [ ] **Step 4: Implement assignee h/l toggle in Update**
-
-In the `filterBrowseFields` section of `Update`, modify the `"h"` and `"l"` cases. When the active field is the Assignee field (index 3), `l` and `h` should cycle through options differently:
-
-- `l` on Assignee: if current is "all", go to "me". If "me", go to first non-"all"/non-"me" option (selected users).
-- `h` on Assignee: reverse.
-
-Actually, the simplest approach: `h`/`l` on Assignee just cycles through the options like `j`/`k` do for other fields. This already works because `tab/l` moves fields and `up/k` and `down/j` cycle values. So the existing hjkl implementation handles this naturally — `j` moves down through `["all", "me", "John Smith", "Jane Doe", ...]`.
-
-But the user wants `h/l` specifically to toggle between `[all]`, `[me]`, and `[selected]` quickly. So `l` on Assignee means: skip all the individual user names and go directly to the next "mode". Let me implement this.
-
-Change the `"h"` and `"l"` cases to handle the Assignee field specially:
-
-```go
-case "tab", "l":
-	if !m.showHelp {
-		if m.activeField == 3 {
-			// Assignee: l cycles modes: all -> me -> selected (first user)
-			m.cycleAssigneeRight()
-		} else {
-			m.activeField = (m.activeField + 1) % len(m.fields)
-		}
-	}
-case "shift+tab", "h":
-	if !m.showHelp {
-		if m.activeField == 3 {
-			// Assignee: h cycles modes: selected -> me -> all
-			m.cycleAssigneeLeft()
-		} else {
-			m.activeField--
-			if m.activeField < 0 {
-				m.activeField = len(m.fields) - 1
-			}
-		}
-	}
-```
-
-Add helper methods:
-
-```go
-func (m *filterModel) cycleAssigneeRight() {
-	field := &m.fields[3]
-	if field.current == 0 {
-		// all -> me
-		field.current = 1
-	} else if field.current == 1 {
-		// me -> selected (first non-all/me option)
-		if len(field.options) > 2 {
-			field.current = 2
-		}
-	} else {
-		// selected -> all
-		field.current = 0
-	}
-}
-
-func (m *filterModel) cycleAssigneeLeft() {
-	field := &m.fields[3]
-	if field.current == 0 {
-		// all -> selected (last option)
-		field.current = len(field.options) - 1
-	} else if field.current == 1 {
-		// me -> all
-		field.current = 0
-	} else {
-		// selected -> me
-		field.current = 1
+	// h at all (should stay at 0)
+	m.Update(keyMsg("h"))
+	if m.fields[3].current != 0 {
+		t.Fatalf("expected current=0 (clamped), got %d", m.fields[3].current)
 	}
 }
 ```
 
-- [ ] **Step 5: Update FilterOptions to handle assignee correctly**
+- [ ] **Step 4: Verify FilterOptions handles assignee correctly**
 
 The existing `FilterOptions()` method already maps field values to filter options. For Assignee, the value "me" maps to `work_packages.Assignee = "me"`, and a user name maps to that name. This already works correctly with the current code.
 
-- [ ] **Step 6: Run all filter tests**
+- [ ] **Step 5: Run all filter tests**
 
 ```bash
 go test -v -run TestFilter ./cmd/tui/
 ```
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add cmd/tui/filter_view.go cmd/tui/filter_view_test.go
