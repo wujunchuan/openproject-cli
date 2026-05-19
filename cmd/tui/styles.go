@@ -27,9 +27,6 @@ var (
 	normalItemStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#DDD"))
 
-	statusStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFD700"))
-
 	errorStyle = lipgloss.NewStyle().
 			Foreground(errorColor).
 			Bold(true)
@@ -52,3 +49,12 @@ var (
 				BorderForeground(highlightColor).
 				Padding(1, 2)
 )
+
+// statusColorStyle returns a lipgloss style with the given hex color foreground.
+// Falls back to gold (#FFD700) if the color string is empty.
+func statusColorStyle(hex string) lipgloss.Style {
+	if hex == "" {
+		hex = "#FFD700"
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(hex))
+}

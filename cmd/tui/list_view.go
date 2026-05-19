@@ -12,6 +12,7 @@ import (
 	"github.com/opf/openproject-cli/components/configuration"
 	"github.com/opf/openproject-cli/components/launch"
 	"github.com/opf/openproject-cli/components/requests"
+	"github.com/opf/openproject-cli/components/resources/status"
 	"github.com/opf/openproject-cli/components/resources/work_packages"
 	"github.com/opf/openproject-cli/components/routes"
 	"github.com/opf/openproject-cli/models"
@@ -36,6 +37,7 @@ type listModel struct {
 	filter        *filterModel
 	filterOverlay bool
 	showHelp      bool
+	statusColors  map[string]string
 }
 
 func newListModel() *listModel {
@@ -61,6 +63,7 @@ func (m *listModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		m.loadWorkPackages,
+		m.loadStatusColors,
 	)
 }
 
@@ -88,6 +91,18 @@ func (m *listModel) loadWorkPackages() tea.Msg {
 	query := requests.NewPaginatedQuery(int(m.pageSize), nil)
 	collection, err := work_packages.All(&m.filterOpts, query, false)
 	return workPackagesLoadedMsg{collection: collection, err: err}
+}
+
+func (m *listModel) loadStatusColors() tea.Msg {
+	colors := make(map[string]string)
+	if ss, err := status.All(); err == nil {
+		for _, s := range ss {
+			if s.Color != "" {
+				colors[s.Name] = s.Color
+			}
+		}
+	}
+	return statusColorsLoadedMsg{colors: colors}
 }
 
 func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
@@ -368,16 +383,27 @@ func (m *listModel) View() string {
 	for i := m.scrollOffset; i < end; i++ {
 		wp := m.items[i]
 		idStr := fmt.Sprintf("#%d", wp.Id)
-		line := padRight(idStr, idWidth) + " " +
-			padRight(truncate(wp.Type, typeWidth), typeWidth) + " " +
-			padRight(truncate(wp.Subject, titleWidth), titleWidth) + " " +
-			padRight(truncate(wp.Status, statusWidth), statusWidth) + " " +
-			padRight(truncate(assigneeOrDash(wp.Assignee), assigneeWidth), assigneeWidth)
+		colID := padRight(idStr, idWidth)
+		colType := padRight(truncate(wp.Type, typeWidth), typeWidth)
+		colTitle := padRight(truncate(wp.Subject, titleWidth), titleWidth)
+		colStatus := padRight(truncate(wp.Status, statusWidth), statusWidth)
+		colAssignee := padRight(truncate(assigneeOrDash(wp.Assignee), assigneeWidth), assigneeWidth)
 
 		if i == m.selected {
-			b.WriteString(selectedItemStyle.Render(line))
+			b.WriteString(selectedItemStyle.Render(colID) + " " +
+				selectedItemStyle.Render(colType) + " " +
+				selectedItemStyle.Render(colTitle) + " " +
+				selectedItemStyle.Render(colStatus) + " " +
+				selectedItemStyle.Render(colAssignee))
 		} else {
-			b.WriteString(normalItemStyle.Render(line))
+			if hex, ok := m.statusColors[wp.Status]; ok {
+				colStatus = statusColorStyle(hex).Render(colStatus)
+			}
+			b.WriteString(normalItemStyle.Render(colID) + " " +
+				normalItemStyle.Render(colType) + " " +
+				normalItemStyle.Render(colTitle) + " " +
+				colStatus + " " +
+				normalItemStyle.Render(colAssignee))
 		}
 		b.WriteString("\n")
 	}

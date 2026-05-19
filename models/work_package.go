@@ -6,6 +6,7 @@ type WorkPackage struct {
 	Type        string
 	Assignee    string
 	Status      string
+	StatusColor string
 	Description string
 	LockVersion int
 	Priority    string

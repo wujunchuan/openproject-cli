@@ -65,8 +65,12 @@ func (m *detailModel) updateContent() {
 	b.WriteString("\n\n")
 
 	// Properties (two columns)
+	statusStr := m.wp.Status
+	if m.wp.StatusColor != "" {
+		statusStr = statusColorStyle(m.wp.StatusColor).Render(m.wp.Status)
+	}
 	left := fmt.Sprintf("Type: %s\nStatus: %s\nProject: %s\nAssignee: %s",
-		m.wp.Type, m.wp.Status, m.wp.Project, assigneeOrDash(m.wp.Assignee))
+		m.wp.Type, statusStr, m.wp.Project, assigneeOrDash(m.wp.Assignee))
 	right := fmt.Sprintf("Priority: %s\nVersion: %s\nStart: %s\nDue: %s\nCreated: %s\nUpdated: %s",
 		m.wp.Priority, m.wp.Version,
 		dateOrDash(m.wp.StartDate), dateOrDash(m.wp.DueDate),

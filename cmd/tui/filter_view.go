@@ -53,6 +53,8 @@ func newFilterModel() *filterModel {
 
 func (m *filterModel) loadOptions() tea.Cmd {
 	return func() tea.Msg {
+		statusColors := make(map[string]string)
+
 		// Load projects
 		if ps, err := projects.All(); err == nil {
 			m.fields[0].options = []string{"all"}
@@ -66,6 +68,9 @@ func (m *filterModel) loadOptions() tea.Cmd {
 			m.fields[1].options = []string{"all"}
 			for _, s := range ss {
 				m.fields[1].options = append(m.fields[1].options, s.Name)
+				if s.Color != "" {
+					statusColors[s.Name] = s.Color
+				}
 			}
 		}
 
@@ -85,7 +90,7 @@ func (m *filterModel) loadOptions() tea.Cmd {
 			}
 		}
 
-		return nil
+		return statusColorsLoadedMsg{colors: statusColors}
 	}
 }
 

@@ -41,6 +41,10 @@ type errorMsg struct {
 type copyConfirmMsg struct{}
 type copyClearMsg struct{}
 
+type statusColorsLoadedMsg struct {
+	colors map[string]string
+}
+
 // --- App Model ---
 
 type App struct {
@@ -111,6 +115,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.err = msg.err
 		} else {
 			a.err = nil
+			if hex, ok := a.list.statusColors[msg.wp.Status]; ok {
+				msg.wp.StatusColor = hex
+			}
 			if a.detail != nil {
 				a.detail.SetWorkPackage(msg.wp)
 			}
@@ -129,6 +136,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case openDetailMsg:
 		a.state = detailView
+		if hex, ok := a.list.statusColors[msg.wp.Status]; ok {
+			msg.wp.StatusColor = hex
+		}
 		a.detail = newDetailModel(msg.wp, a.width, a.height)
 		return a, a.detail.Init()
 
@@ -153,6 +163,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case copyClearMsg:
 		a.copyConfirm = false
+		return a, nil
+
+	case statusColorsLoadedMsg:
+		a.list.statusColors = msg.colors
 		return a, nil
 	}
 
