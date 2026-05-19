@@ -38,6 +38,9 @@ type listModel struct {
 	filterOverlay bool
 	showHelp      bool
 	statusColors  map[string]string
+	treeMode      bool
+	treeRoots     []*treeNode
+	flatNodes     []*treeNode
 }
 
 func newListModel() *listModel {
@@ -80,6 +83,9 @@ func (m *listModel) SetWorkPackages(collection *models.WorkPackageCollection) {
 		m.selected = 0
 	}
 	m.sortItems()
+	if m.treeMode {
+		m.buildTreeFromItems()
+	}
 }
 
 func (m *listModel) SetSize(w, h int) {
@@ -179,6 +185,86 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 				}
 			}
 			return m, nil
+		}
+
+		// Tree mode keys (active when not in search/filter/help)
+		if !m.filterOverlay && !m.searchActive && !m.showHelp {
+			if msg.String() == "t" {
+				m.treeMode = !m.treeMode
+				if m.treeMode {
+					m.buildTreeFromItems()
+				} else {
+					// Sync selected back to items index
+					if m.selected >= 0 && m.selected < len(m.flatNodes) {
+						wp := m.flatNodes[m.selected].item
+						for i, item := range m.items {
+							if item.Id == wp.Id {
+								m.selected = i
+								break
+							}
+						}
+					}
+				}
+				return m, nil
+			}
+
+			if m.treeMode {
+				switch msg.String() {
+				case "right", ">":
+					if m.selected >= 0 && m.selected < len(m.flatNodes) {
+						node := m.flatNodes[m.selected]
+						if node.hasChildren() && !node.expanded {
+							node.expanded = true
+							m.flatNodes = flatten(m.treeRoots)
+						}
+					}
+					return m, nil
+				case "left", "<":
+					if m.selected >= 0 && m.selected < len(m.flatNodes) {
+						node := m.flatNodes[m.selected]
+						if node.hasChildren() && node.expanded {
+							node.expanded = false
+							m.flatNodes = flatten(m.treeRoots)
+							if m.selected >= len(m.flatNodes) {
+								m.selected = len(m.flatNodes) - 1
+							}
+						}
+					}
+					return m, nil
+				case "enter":
+					if m.selected >= 0 && m.selected < len(m.flatNodes) {
+						node := m.flatNodes[m.selected]
+						if node.hasChildren() {
+							node.expanded = !node.expanded
+							m.flatNodes = flatten(m.treeRoots)
+							if m.selected >= len(m.flatNodes) {
+								m.selected = len(m.flatNodes) - 1
+							}
+							return m, nil
+						}
+						return m, OpenDetailCmd(node.item)
+					}
+				case "up", "k":
+					if m.selected > 0 {
+						m.selected--
+					}
+					return m, nil
+				case "down", "j":
+					if m.selected < len(m.flatNodes)-1 {
+						m.selected++
+					}
+					return m, nil
+				case "s":
+					// Sort in tree mode: cycle sort, sort items, then rebuild tree.
+					// Sorting applies within sibling groups (parent-child preserved).
+					m.cycleSort()
+					m.buildTreeFromItems()
+					return m, nil
+				case "r":
+					m.loading = true
+					return m, tea.Batch(m.spinner.Tick, m.loadWorkPackages)
+				}
+			}
 		}
 
 		switch msg.String() {
@@ -294,6 +380,31 @@ func (m *listModel) sortItems() {
 			return m.items[i].Id < m.items[j].Id
 		}
 	})
+}
+
+func (m *listModel) buildTreeFromItems() {
+	cmp := m.treeSortFunc()
+	m.treeRoots = buildTree(m.items, cmp)
+	m.flatNodes = flatten(m.treeRoots)
+	if m.selected >= len(m.flatNodes) {
+		m.selected = len(m.flatNodes) - 1
+	}
+	if m.selected < 0 && len(m.flatNodes) > 0 {
+		m.selected = 0
+	}
+}
+
+func (m *listModel) treeSortFunc() sortFunc {
+	switch m.sortField {
+	case sortByStatus:
+		return func(a, b *treeNode) bool { return a.item.Status < b.item.Status }
+	case sortByType:
+		return func(a, b *treeNode) bool { return a.item.Type < b.item.Type }
+	case sortByAssignee:
+		return func(a, b *treeNode) bool { return a.item.Assignee < b.item.Assignee }
+	default:
+		return byID
+	}
 }
 
 func (m *listModel) View() string {
