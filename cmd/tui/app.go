@@ -83,6 +83,14 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, tea.Quit
 		}
 
+
+		case tea.MouseMsg:
+			switch a.state {
+			case listView:
+				a.list, cmd = a.list.Update(msg)
+				cmds = append(cmds, cmd)
+			}
+			return a, tea.Batch(cmds...)
 	case workPackagesLoadedMsg:
 		if msg.err != nil {
 			a.err = msg.err

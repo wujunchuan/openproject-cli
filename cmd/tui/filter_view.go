@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/opf/openproject-cli/components/configuration"
 	"github.com/opf/openproject-cli/components/resources/projects"
 	"github.com/opf/openproject-cli/components/resources/status"
 	resTypes "github.com/opf/openproject-cli/components/resources/types"
@@ -167,4 +168,29 @@ func (m *filterModel) View() string {
 	b.WriteString("\n")
 	b.WriteString(helpStyle.Render("  tab/shift+tab field  ↑↓ select  enter apply  esc cancel  c clear  ? help"))
 	return b.String()
+}
+
+func (m *filterModel) toFilterState() configuration.FilterState {
+	return configuration.FilterState{
+		Project:  m.fields[0].options[m.fields[0].current],
+		Status:   m.fields[1].options[m.fields[1].current],
+		Type:     m.fields[2].options[m.fields[2].current],
+		Assignee: m.fields[3].options[m.fields[3].current],
+	}
+}
+
+func (m *filterModel) setFromState(fs configuration.FilterState) {
+	vals := []string{fs.Project, fs.Status, fs.Type, fs.Assignee}
+	for i, field := range m.fields {
+		val := vals[i]
+		if val == "" {
+			val = "all"
+		}
+		for j, opt := range field.options {
+			if opt == val {
+				m.fields[i].current = j
+				break
+			}
+		}
+	}
 }

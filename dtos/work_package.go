@@ -26,6 +26,8 @@ type WorkPackageDto struct {
 	LockVersion int                  `json:"lockVersion,omitempty"`
 	CreatedAt   string               `json:"createdAt,omitempty"`
 	UpdatedAt   string               `json:"updatedAt,omitempty"`
+	StartDate   string               `json:"startDate,omitempty"`
+	DueDate     string               `json:"dueDate,omitempty"`
 }
 
 type embeddedDto struct {
@@ -58,6 +60,8 @@ func (dto *WorkPackageDto) Convert() *models.WorkPackage {
 		LockVersion: dto.LockVersion,
 		CreatedAt:   dto.CreatedAt,
 		UpdatedAt:   dto.UpdatedAt,
+		StartDate:   dto.StartDate,
+		DueDate:     dto.DueDate,
 	}
 	if dto.Links != nil {
 		if dto.Links.Type != nil {

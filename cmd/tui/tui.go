@@ -22,6 +22,7 @@ func runTui(_ *cobra.Command, _ []string) {
 	p := tea.NewProgram(
 		NewApp(),
 		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
 	)
 
 	if _, err := p.Run(); err != nil {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/opf/openproject-cli/components/resources/work_packages"
 	"github.com/opf/openproject-cli/models"
@@ -14,6 +15,7 @@ type editState int
 const (
 	editChooseField editState = iota
 	editChooseValue
+	editTextInput
 	editSubmitting
 )
 
@@ -24,13 +26,20 @@ type editModel struct {
 	optionIndex int
 	err         string
 	width       int
+	activeField string
+	textInput   textinput.Model
 }
 
 func newEditModel(wp *models.WorkPackage, w int) *editModel {
+	ti := textinput.New()
+	ti.Placeholder = "YYYY-MM-DD"
+	ti.CharLimit = 10
+	ti.Width = 30
 	return &editModel{
-		wp:    wp,
-		state: editChooseField,
-		width: w,
+		wp:        wp,
+		state:     editChooseField,
+		width:     w,
+		textInput: ti,
 	}
 }
 
@@ -45,7 +54,20 @@ func (m *editModel) Update(msg tea.Msg) (*editModel, tea.Cmd) {
 		switch keyMsg.String() {
 		case "t":
 			m.state = editChooseValue
+			m.activeField = "type"
 			return m, m.loadTypes
+		case "s":
+			m.state = editTextInput
+			m.activeField = "startDate"
+			m.textInput.SetValue(m.wp.StartDate)
+			m.textInput.Focus()
+			return m, nil
+		case "d":
+			m.state = editTextInput
+			m.activeField = "dueDate"
+			m.textInput.SetValue(m.wp.DueDate)
+			m.textInput.Focus()
+			return m, nil
 		case "esc":
 			return m, func() tea.Msg { return editDoneMsg{} }
 		}
@@ -71,6 +93,21 @@ func (m *editModel) Update(msg tea.Msg) (*editModel, tea.Cmd) {
 			m.err = ""
 			return m, nil
 		}
+
+	case editTextInput:
+		switch keyMsg.String() {
+		case "esc":
+			m.state = editChooseField
+			m.textInput.Blur()
+			return m, nil
+		case "enter":
+			m.state = editSubmitting
+			m.textInput.Blur()
+			return m, m.submitDate
+		}
+		var cmd tea.Cmd
+		m.textInput, cmd = m.textInput.Update(msg)
+		return m, cmd
 	}
 
 	return m, nil
@@ -106,6 +143,25 @@ func (m *editModel) submitType() tea.Msg {
 	return editDoneMsg{refresh: true}
 }
 
+func (m *editModel) submitDate() tea.Msg {
+	value := m.textInput.Value()
+	var updateOpt work_packages.UpdateOption
+	switch m.activeField {
+	case "startDate":
+		updateOpt = work_packages.UpdateStartDate
+	case "dueDate":
+		updateOpt = work_packages.UpdateDueDate
+	default:
+		return editErrorMsg{err: "unknown field"}
+	}
+	opts := map[work_packages.UpdateOption]string{updateOpt: value}
+	_, err := work_packages.Update(m.wp.Id, opts)
+	if err != nil {
+		return editErrorMsg{err: err.Error()}
+	}
+	return editDoneMsg{refresh: true}
+}
+
 func (m *editModel) View() string {
 	var b strings.Builder
 
@@ -120,7 +176,9 @@ func (m *editModel) View() string {
 
 	switch m.state {
 	case editChooseField:
-		b.WriteString("  [T]ype\n\n")
+		b.WriteString("  [T]ype\n")
+		b.WriteString("  [S]tart date\n")
+		b.WriteString("  [D]ue date\n\n")
 		b.WriteString(helpStyle.Render("  Press a key to select a field, esc to cancel"))
 	case editChooseValue:
 		b.WriteString("  Select type:\n\n")
@@ -136,11 +194,26 @@ func (m *editModel) View() string {
 		}
 		b.WriteString("\n")
 		b.WriteString(helpStyle.Render("  ↑↓ select  enter confirm  esc back"))
+	case editTextInput:
+		b.WriteString(fmt.Sprintf("  %s:\n\n", fieldLabel(m.activeField)))
+		b.WriteString("  " + m.textInput.View() + "\n\n")
+		b.WriteString(helpStyle.Render("  enter confirm  esc cancel"))
 	case editSubmitting:
 		b.WriteString("  Submitting...\n")
 	}
 
 	return b.String()
+}
+
+func fieldLabel(field string) string {
+	switch field {
+	case "startDate":
+		return "Start date"
+	case "dueDate":
+		return "Due date"
+	default:
+		return field
+	}
 }
 
 // --- Edit Messages ---

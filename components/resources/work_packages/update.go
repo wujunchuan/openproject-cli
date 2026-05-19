@@ -23,14 +23,18 @@ const (
 	UpdateAttachment
 	UpdateSubject
 	UpdateType
+	UpdateStartDate
+	UpdateDueDate
 )
 
-var patchableUpdates = []UpdateOption{UpdateSubject, UpdateType, UpdateAssignee}
+var patchableUpdates = []UpdateOption{UpdateSubject, UpdateType, UpdateAssignee, UpdateStartDate, UpdateDueDate}
 
 var patchMap = map[UpdateOption]func(patch, workPackage *dtos.WorkPackageDto, input string) (string, error){
 	UpdateAssignee: assigneePatch,
 	UpdateType:     typePatch,
 	UpdateSubject:  subjectPatch,
+	UpdateStartDate: startDatePatch,
+	UpdateDueDate:   dueDatePatch,
 }
 
 func Update(id uint64, options map[UpdateOption]string) (*models.WorkPackage, error) {
@@ -159,4 +163,14 @@ func assigneePatch(patch, _ *dtos.WorkPackageDto, input string) (string, error) 
 
 	patch.Links.Assignee = &dtos.LinkDto{Href: paths.User(userId)}
 	return fmt.Sprintf("Assignee -> %s", input), nil
+}
+
+func startDatePatch(patch, _ *dtos.WorkPackageDto, input string) (string, error) {
+	patch.StartDate = input
+	return fmt.Sprintf("Start date -> %s", input), nil
+}
+
+func dueDatePatch(patch, _ *dtos.WorkPackageDto, input string) (string, error) {
+	patch.DueDate = input
+	return fmt.Sprintf("Due date -> %s", input), nil
 }

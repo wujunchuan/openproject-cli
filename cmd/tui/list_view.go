@@ -8,6 +8,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	runewidth "github.com/mattn/go-runewidth"
+	"github.com/opf/openproject-cli/components/configuration"
 	"github.com/opf/openproject-cli/components/launch"
 	"github.com/opf/openproject-cli/components/requests"
 	"github.com/opf/openproject-cli/components/resources/work_packages"
@@ -39,13 +41,18 @@ func newListModel() *listModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = selectedItemStyle
+
+	fm := newFilterModel()
+	savedFilters, _ := configuration.LoadFilters()
+	fm.setFromState(savedFilters)
+
 	return &listModel{
 		loading:    true,
 		pageSize:   50,
 		page:       1,
 		spinner:    s,
-		filterOpts: make(map[work_packages.FilterOption]string),
-		filter:     newFilterModel(),
+		filterOpts: fm.FilterOptions(),
+		filter:     fm,
 	}
 }
 
@@ -92,6 +99,15 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			if !m.filterOverlay && !m.searchActive && !m.showHelp {
+				row := m.mouseEventToRow(msg.Y)
+				if row >= 0 && row < len(m.items) {
+					m.selected = row
+				}
+			}
+		}
 	case tea.KeyMsg:
 		// Filter overlay handling
 		if m.filterOverlay {
@@ -109,6 +125,7 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 			case "enter":
 				if !m.filter.showHelp {
 					m.filterOpts = m.filter.FilterOptions()
+					configuration.SaveFilters(m.filter.toFilterState())
 					m.filterOverlay = false
 					m.loading = true
 					m.page = 1
@@ -322,27 +339,24 @@ func (m *listModel) View() string {
 		titleWidth = 20
 	}
 
-	// Table header
-	b.WriteString(headerStyle.Render(fmt.Sprintf(
-		"%-*s %-*s %-*s %-*s %-*s",
-		idWidth, "ID",
-		typeWidth, "Type",
-		titleWidth, "Title",
-		statusWidth, "Status",
-		assigneeWidth, "Assignee",
-	)))
+		// Table header
+		headerLine := padRight("ID", idWidth) + " " +
+			padRight("Type", typeWidth) + " " +
+			padRight("Title", titleWidth) + " " +
+			padRight("Status", statusWidth) + " " +
+			padRight("Assignee", assigneeWidth)
+		b.WriteString(headerStyle.Render(headerLine))
+		b.WriteString("\n")
 	b.WriteString("\n")
 
 	// Items
 	for i, wp := range m.items {
-		line := fmt.Sprintf(
-			"#%-*d %-*s %-*s %-*s %-*s",
-			idWidth-1, wp.Id,
-			typeWidth, truncate(wp.Type, typeWidth),
-			titleWidth, truncate(wp.Subject, titleWidth),
-			statusWidth, truncate(wp.Status, statusWidth),
-			assigneeWidth, truncate(assigneeOrDash(wp.Assignee), assigneeWidth),
-		)
+		idStr := fmt.Sprintf("#%d", wp.Id)
+		line := padRight(idStr, idWidth) + " " +
+			padRight(truncate(wp.Type, typeWidth), typeWidth) + " " +
+			padRight(truncate(wp.Subject, titleWidth), titleWidth) + " " +
+			padRight(truncate(wp.Status, statusWidth), statusWidth) + " " +
+			padRight(truncate(assigneeOrDash(wp.Assignee), assigneeWidth), assigneeWidth)
 
 		if i == m.selected {
 			b.WriteString(selectedItemStyle.Render(line))
@@ -376,15 +390,22 @@ func (m *listModel) View() string {
 	return b.String()
 }
 
-func truncate(s string, maxLen int) string {
-	runes := []rune(s)
-	if len(runes) <= maxLen {
+func truncate(s string, maxDisplayWidth int) string {
+	if runewidth.StringWidth(s) <= maxDisplayWidth {
 		return s
 	}
-	if maxLen <= 1 {
-		return string(runes[:maxLen])
+	if maxDisplayWidth <= 1 {
+		return runewidth.Truncate(s, maxDisplayWidth, "")
 	}
-	return string(runes[:maxLen-1]) + "…"
+	return runewidth.Truncate(s, maxDisplayWidth, "…")
+}
+
+func padRight(s string, width int) string {
+	w := runewidth.StringWidth(s)
+	if w >= width {
+		return runewidth.Truncate(s, width, "")
+	}
+	return s + strings.Repeat(" ", width-w)
 }
 
 func assigneeOrDash(s string) string {
@@ -392,4 +413,21 @@ func assigneeOrDash(s string) string {
 		return "—"
 	}
 	return s
+}
+
+func (m *listModel) mouseEventToRow(y int) int {
+	// docStyle top padding: 1 line
+	// title line: 1 line
+	// filter bar: 0 or 1 line
+	// blank line: 1 line
+	// table header: 1 line
+	offset := 4 // top pad + title + blank + header
+	if len(m.filterOpts) > 0 {
+		offset++ // filter bar
+	}
+	row := y - offset
+	if row < 0 || row >= len(m.items) {
+		return -1
+	}
+	return row
 }

@@ -67,8 +67,10 @@ func (m *detailModel) updateContent() {
 	// Properties (two columns)
 	left := fmt.Sprintf("Type: %s\nStatus: %s\nProject: %s\nAssignee: %s",
 		m.wp.Type, m.wp.Status, m.wp.Project, assigneeOrDash(m.wp.Assignee))
-	right := fmt.Sprintf("Priority: %s\nVersion: %s\nCreated: %s\nUpdated: %s",
-		m.wp.Priority, m.wp.Version, m.wp.CreatedAt, m.wp.UpdatedAt)
+	right := fmt.Sprintf("Priority: %s\nVersion: %s\nStart: %s\nDue: %s\nCreated: %s\nUpdated: %s",
+		m.wp.Priority, m.wp.Version,
+		dateOrDash(m.wp.StartDate), dateOrDash(m.wp.DueDate),
+		m.wp.CreatedAt, m.wp.UpdatedAt)
 
 	leftCol := lipgloss.NewStyle().Width(m.width/2 - 4).Render(left)
 	rightCol := lipgloss.NewStyle().Width(m.width/2 - 4).Render(right)
@@ -179,7 +181,7 @@ func (m *detailModel) View() string {
 			{"↑ / ↓", "scroll content"},
 			{"PgUp / PgDn", "scroll page"},
 			{"esc", "back to list"},
-			{"e", "edit (change type)"},
+			{"e", "edit (type, start/due date)"},
 			{"o", "open in browser"},
 			{"r", "refresh"},
 			{"?", "toggle this help"},
@@ -190,4 +192,11 @@ func (m *detailModel) View() string {
 	}
 	footer := helpStyle.Render("  esc back  e edit  o browser  r refresh  ? help")
 	return m.viewport.View() + "\n" + footer
+}
+
+func dateOrDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
 }

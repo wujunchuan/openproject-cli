@@ -13,6 +13,8 @@ type WorkPackage struct {
 	Version     string
 	CreatedAt   string
 	UpdatedAt   string
+	StartDate   string
+	DueDate     string
 }
 
 type WorkPackageCollection struct {
