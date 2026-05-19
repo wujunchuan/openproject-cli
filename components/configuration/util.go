@@ -85,6 +85,21 @@ func configFileDir() string {
 	return filepath.Join(homeDir(), ".config", configDirName)
 }
 
+func ReadConfigValue(key string) string {
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+	return ""
+}
+
+func CopyPrefix() string {
+	prefix := ReadConfigValue("OP_CLI_COPY_PREFIX")
+	if prefix == "" {
+		return "OP"
+	}
+	return prefix
+}
+
 func homeDir() string {
 	if home, ok := os.LookupEnv("HOME"); ok {
 		return home
