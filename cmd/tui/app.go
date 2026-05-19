@@ -177,12 +177,3 @@ func BackToListCmd() tea.Cmd {
 	}
 }
 
-// Temporary stubs - will be replaced by detail_view.go
-type detailModel struct{}
-
-func newDetailModel(wp *models.WorkPackage, w, h int) *detailModel { return &detailModel{} }
-func (m *detailModel) Init() tea.Cmd                               { return nil }
-func (m *detailModel) SetWorkPackage(wp *models.WorkPackage)       {}
-func (m *detailModel) SetActivities(a []*models.Activity)          {}
-func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd)  { return m, nil }
-func (m *detailModel) View() string                                { return "" }
