@@ -110,6 +110,13 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 				}
 			}
 		}
+	case filterApplyMsg:
+		m.filterOpts = m.filter.FilterOptions()
+		configuration.SaveFilters(m.filter.toFilterState())
+		m.filterOverlay = false
+		m.loading = true
+		m.page = 1
+		return m, tea.Batch(m.spinner.Tick, m.loadWorkPackages)
 	case tea.KeyMsg:
 		// Filter overlay handling
 		if m.filterOverlay {
@@ -122,21 +129,14 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 				}
 				return m, nil
 			case "?":
-				m.filter.Update(msg)
-				return m, nil
+				cmd := m.filter.Update(msg)
+				return m, cmd
 			case "enter":
-				if !m.filter.showHelp {
-					m.filterOpts = m.filter.FilterOptions()
-					configuration.SaveFilters(m.filter.toFilterState())
-					m.filterOverlay = false
-					m.loading = true
-					m.page = 1
-					return m, tea.Batch(m.spinner.Tick, m.loadWorkPackages)
-				}
-				return m, nil
+				cmd := m.filter.Update(msg)
+				return m, cmd
 			default:
-				m.filter.Update(msg)
-				return m, nil
+				cmd := m.filter.Update(msg)
+				return m, cmd
 			}
 		}
 

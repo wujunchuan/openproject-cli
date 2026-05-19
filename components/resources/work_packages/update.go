@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/opf/openproject-cli/components/common"
 	"github.com/opf/openproject-cli/components/parser"
 	"github.com/opf/openproject-cli/components/paths"
 	"github.com/opf/openproject-cli/components/printer"
 	"github.com/opf/openproject-cli/components/requests"
+	"github.com/opf/openproject-cli/components/resources/status"
 	"github.com/opf/openproject-cli/dtos"
 	"github.com/opf/openproject-cli/models"
 )
@@ -25,16 +27,18 @@ const (
 	UpdateType
 	UpdateStartDate
 	UpdateDueDate
+	UpdateStatus
 )
 
-var patchableUpdates = []UpdateOption{UpdateSubject, UpdateType, UpdateAssignee, UpdateStartDate, UpdateDueDate}
+var patchableUpdates = []UpdateOption{UpdateSubject, UpdateType, UpdateAssignee, UpdateStartDate, UpdateDueDate, UpdateStatus}
 
 var patchMap = map[UpdateOption]func(patch, workPackage *dtos.WorkPackageDto, input string) (string, error){
-	UpdateAssignee: assigneePatch,
-	UpdateType:     typePatch,
-	UpdateSubject:  subjectPatch,
+	UpdateAssignee:  assigneePatch,
+	UpdateType:      typePatch,
+	UpdateSubject:   subjectPatch,
 	UpdateStartDate: startDatePatch,
 	UpdateDueDate:   dueDatePatch,
+	UpdateStatus:    statusPatch,
 }
 
 func Update(id uint64, options map[UpdateOption]string) (*models.WorkPackage, error) {
@@ -173,4 +177,30 @@ func startDatePatch(patch, _ *dtos.WorkPackageDto, input string) (string, error)
 func dueDatePatch(patch, _ *dtos.WorkPackageDto, input string) (string, error) {
 	patch.DueDate = input
 	return fmt.Sprintf("Due date -> %s", input), nil
+}
+
+func statusPatch(patch, _ *dtos.WorkPackageDto, input string) (string, error) {
+	statuses, err := status.All()
+	if err != nil {
+		return "", err
+	}
+
+	var found *models.Status
+	for _, s := range statuses {
+		if strings.ToLower(input) == strings.ToLower(s.Name) {
+			found = s
+			break
+		}
+	}
+
+	if found == nil {
+		return "", fmt.Errorf("status %q not found", input)
+	}
+
+	if patch.Links == nil {
+		patch.Links = &dtos.WorkPackageLinksDto{}
+	}
+
+	patch.Links.Status = &dtos.LinkDto{Href: paths.Status() + "/" + strconv.FormatUint(found.Id, 10)}
+	return fmt.Sprintf("Status -> %s", found.Name), nil
 }

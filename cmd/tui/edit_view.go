@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/opf/openproject-cli/components/resources/status"
 	"github.com/opf/openproject-cli/components/resources/work_packages"
 	"github.com/opf/openproject-cli/models"
 )
@@ -56,6 +57,10 @@ func (m *editModel) Update(msg tea.Msg) (*editModel, tea.Cmd) {
 			m.state = editChooseValue
 			m.activeField = "type"
 			return m, m.loadTypes
+		case "u":
+			m.state = editChooseValue
+			m.activeField = "status"
+			return m, m.loadStatuses
 		case "s":
 			m.state = editTextInput
 			m.activeField = "startDate"
@@ -85,7 +90,12 @@ func (m *editModel) Update(msg tea.Msg) (*editModel, tea.Cmd) {
 		case "enter":
 			if m.optionIndex >= 0 && m.optionIndex < len(m.options) {
 				m.state = editSubmitting
-				return m, m.submitType
+				switch m.activeField {
+				case "status":
+					return m, m.submitStatus
+				default:
+					return m, m.submitType
+				}
 			}
 		case "esc":
 			m.state = editChooseField
@@ -125,6 +135,18 @@ func (m *editModel) loadTypes() tea.Msg {
 	return editOptionsMsg{options: opts}
 }
 
+func (m *editModel) loadStatuses() tea.Msg {
+	statuses, err := status.All()
+	if err != nil {
+		return editErrorMsg{err: err.Error()}
+	}
+	var opts []string
+	for _, s := range statuses {
+		opts = append(opts, s.Name)
+	}
+	return editOptionsMsg{options: opts}
+}
+
 func (m *editModel) submitType() tea.Msg {
 	if m.optionIndex >= len(m.options) {
 		return editErrorMsg{err: "invalid selection"}
@@ -133,6 +155,24 @@ func (m *editModel) submitType() tea.Msg {
 
 	opts := map[work_packages.UpdateOption]string{
 		work_packages.UpdateType: selected,
+	}
+
+	_, err := work_packages.Update(m.wp.Id, opts)
+	if err != nil {
+		return editErrorMsg{err: err.Error()}
+	}
+
+	return editDoneMsg{refresh: true}
+}
+
+func (m *editModel) submitStatus() tea.Msg {
+	if m.optionIndex >= len(m.options) {
+		return editErrorMsg{err: "invalid selection"}
+	}
+	selected := m.options[m.optionIndex]
+
+	opts := map[work_packages.UpdateOption]string{
+		work_packages.UpdateStatus: selected,
 	}
 
 	_, err := work_packages.Update(m.wp.Id, opts)
@@ -177,11 +217,12 @@ func (m *editModel) View() string {
 	switch m.state {
 	case editChooseField:
 		b.WriteString("  [T]ype\n")
+		b.WriteString("  [U]status\n")
 		b.WriteString("  [S]tart date\n")
 		b.WriteString("  [D]ue date\n\n")
 		b.WriteString(helpStyle.Render("  Press a key to select a field, esc to cancel"))
 	case editChooseValue:
-		b.WriteString("  Select type:\n\n")
+		b.WriteString(fmt.Sprintf("  Select %s:\n\n", fieldLabel(m.activeField)))
 		for i, opt := range m.options {
 			prefix := "  "
 			if i == m.optionIndex {
@@ -207,6 +248,10 @@ func (m *editModel) View() string {
 
 func fieldLabel(field string) string {
 	switch field {
+	case "type":
+		return "type"
+	case "status":
+		return "status"
 	case "startDate":
 		return "Start date"
 	case "dueDate":

@@ -20,6 +20,8 @@ const (
 	filterPopup
 )
 
+type filterApplyMsg struct{}
+
 type filterField struct {
 	name    string
 	options []string
@@ -136,8 +138,16 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 		if !m.showHelp {
 			m.openPopup()
 		}
+	case "a":
+		if !m.showHelp {
+			return func() tea.Msg { return filterApplyMsg{} }
+		}
 	}
 	return nil
+}
+
+func (m *filterModel) isInPopup() bool {
+	return m.state == filterPopup
 }
 
 func (m *filterModel) openPopup() {
@@ -161,7 +171,7 @@ func (m *filterModel) updatePopup(keyMsg tea.KeyMsg) tea.Cmd {
 		m.fields[m.activeField].current = m.popupIndex
 		m.state = filterBrowseFields
 		m.popupItems = nil
-	case "esc":
+	case "esc", "q":
 		m.state = filterBrowseFields
 		m.popupItems = nil
 	}
@@ -218,6 +228,7 @@ func (m *filterModel) View() string {
 			{"tab / shift+tab", "next / previous field"},
 			{"← / →", "change value"},
 			{"enter", "open popup"},
+			{"a", "apply filters"},
 			{"esc", "cancel / close popup"},
 			{"c", "clear all filters"},
 			{"?", "toggle this help"},
@@ -250,7 +261,7 @@ func (m *filterModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("  j/k field  h/l value  enter popup  esc cancel  c clear  ? help"))
+	b.WriteString(helpStyle.Render("  j/k field  h/l value  enter popup  a apply  esc cancel  c clear  ? help"))
 	return b.String()
 }
 

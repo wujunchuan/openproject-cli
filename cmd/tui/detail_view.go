@@ -186,7 +186,7 @@ func (m *detailModel) View() string {
 			{"PgUp / PgDn", "scroll page"},
 			{"esc", "back to list"},
 			{"c", "copy ID to clipboard"},
-			{"e", "edit (type, start/due date)"},
+			{"e", "edit (type, status, dates)"},
 			{"o", "open in browser"},
 			{"r", "refresh"},
 			{"?", "toggle this help"},
