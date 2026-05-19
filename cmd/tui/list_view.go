@@ -415,7 +415,7 @@ func (m *listModel) treeSortFunc() sortFunc {
 
 func (m *listModel) View() string {
 	if m.showHelp {
-		return helpOverlay("List — Key Bindings", [][2]string{
+		bindings := [][2]string{
 			{"j / k", "move selection"},
 			{"enter / l", "open detail"},
 			{"c", "copy ID to clipboard"},
@@ -425,7 +425,20 @@ func (m *listModel) View() string {
 			{"r", "refresh"},
 			{"?", "toggle this help"},
 			{"q", "quit"},
-		}, m.width)
+		}
+		if m.treeMode {
+			bindings = append([][2]string{
+				{"t", "toggle tree/list mode"},
+				{"enter", "expand/collapse or open detail"},
+				{"> / →", "expand node"},
+				{"< / ←", "collapse node"},
+			}, bindings...)
+		} else {
+			bindings = append([][2]string{
+				{"t", "toggle tree/list mode"},
+			}, bindings...)
+		}
+		return helpOverlay("List — Key Bindings", bindings, m.width)
 	}
 
 	if m.filterOverlay {
