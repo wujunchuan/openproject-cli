@@ -92,7 +92,7 @@ func flatten(roots []*treeNode) []*treeNode {
 	walk = func(nodes []*treeNode) {
 		for _, n := range nodes {
 			result = append(result, n)
-			if n.expanded && len(n.children) > 0 {
+			if n.expanded {
 				walk(n.children)
 			}
 		}
@@ -152,28 +152,15 @@ func computeAncestorsLast(flat []*treeNode, index int) []bool {
 	for i := index - 1; i >= 0; i-- {
 		candidate := flat[i]
 		if candidate.depth < node.depth {
-			// candidate is an ancestor
 			// Check if candidate is the last child of its parent
 			isLast := true
-			if candidate.depth > 0 {
-				// Find candidate's parent and check if candidate is last
-				for j := i + 1; j < len(flat); j++ {
-					if flat[j].depth == candidate.depth {
-						// Another sibling at same depth comes after
-						isLast = false
-						break
-					}
-					if flat[j].depth < candidate.depth {
-						break
-					}
+			for j := i + 1; j < len(flat); j++ {
+				if flat[j].depth == candidate.depth {
+					isLast = false
+					break
 				}
-			} else {
-				// Root level: check if there's another root after this one
-				for j := i + 1; j < len(flat); j++ {
-					if flat[j].depth == 0 {
-						isLast = false
-						break
-					}
+				if flat[j].depth < candidate.depth {
+					break
 				}
 			}
 			ancestorsLast = append([]bool{isLast}, ancestorsLast...)
