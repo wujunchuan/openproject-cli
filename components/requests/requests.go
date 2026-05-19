@@ -140,6 +140,10 @@ func isSuccess(code int) bool {
 	return code >= 200 && code <= 299
 }
 
+func SetSilent(b bool) {
+	printer.SetSilent(b)
+}
+
 func hostUnitialised() bool {
 	return len(host.Scheme) == 0 || len(host.Host) == 0
 }
