@@ -468,6 +468,11 @@ func (m *listModel) View() string {
 		return b.String()
 	}
 
+	// Tree mode rendering
+	if m.treeMode {
+		return m.treeView()
+	}
+
 	// Column widths
 	idWidth := len(strconv.FormatInt(m.total, 10)) + 2
 	if idWidth < 6 {
@@ -546,6 +551,128 @@ func (m *listModel) View() string {
 	b.WriteString("\n")
 	keys := []string{"j/k", "move", "enter/l", "open", "c", "copy", "/", "search", "f", "filter", "?", "help", "q", "quit"}
 	b.WriteString(helpStyle.Render("  " + strings.Join(keys, " ")))
+
+	return b.String()
+}
+
+func (m *listModel) treeView() string {
+	var b strings.Builder
+
+	// Header
+	b.WriteString(titleStyle.Render("Work Packages"))
+	if m.total > 0 {
+		b.WriteString(subtitleStyle.Render(fmt.Sprintf(" (%d total)", m.total)))
+	}
+	b.WriteString(subtitleStyle.Render("  [tree]"))
+	b.WriteString("\n")
+
+	// Active filters
+	if len(m.filterOpts) > 0 {
+		var parts []string
+		keys := []work_packages.FilterOption{work_packages.Project, work_packages.Status, work_packages.Type, work_packages.Assignee}
+		for _, k := range keys {
+			if v, ok := m.filterOpts[k]; ok {
+				parts = append(parts, fmt.Sprintf("%s=%s", k, v))
+			}
+		}
+		b.WriteString(subtitleStyle.Render("  Filter: " + strings.Join(parts, "  ")))
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+
+	if len(m.flatNodes) == 0 {
+		b.WriteString("\n  No work packages found.\n\n")
+		return b.String()
+	}
+
+	// Column widths (account for indent)
+	maxDepth := 0
+	for _, n := range m.flatNodes {
+		if n.depth > maxDepth {
+			maxDepth = n.depth
+		}
+	}
+	indentWidth := maxDepth*4 + 2 // 4 chars per depth level + margin
+
+	idWidth := len(strconv.FormatInt(m.total, 10)) + 2
+	if idWidth < 6 {
+		idWidth = 6
+	}
+	typeWidth := 12
+	statusWidth := 12
+	assigneeWidth := 14
+	titleWidth := m.width - idWidth - typeWidth - statusWidth - assigneeWidth - indentWidth - 12
+	if titleWidth < 20 {
+		titleWidth = 20
+	}
+
+	// Table header
+	headerLine := strings.Repeat(" ", indentWidth) +
+		padRight("ID", idWidth) + " " +
+		padRight("Type", typeWidth) + " " +
+		padRight("Title", titleWidth) + " " +
+		padRight("Status", statusWidth) + " " +
+		padRight("Assignee", assigneeWidth)
+	b.WriteString(headerStyle.Render(headerLine))
+	b.WriteString("\n\n")
+
+	// Render each visible node
+	for i, node := range m.flatNodes {
+		// Determine if this node is the last child of its parent
+		isLast := true
+		for j := i + 1; j < len(m.flatNodes); j++ {
+			if m.flatNodes[j].depth == node.depth {
+				isLast = false
+				break
+			}
+			if m.flatNodes[j].depth < node.depth {
+				break
+			}
+		}
+
+		ancLast := computeAncestorsLast(m.flatNodes, i)
+		prefix := treeLinePrefix(node.depth, isLast, ancLast)
+
+		// Expand/collapse marker
+		marker := "  "
+		if node.hasChildren() {
+			if node.expanded {
+				marker = "▼ "
+			} else {
+				marker = "▶ "
+			}
+		}
+
+		wp := node.item
+		idStr := fmt.Sprintf("#%d", wp.Id)
+		line := marker + padRight(idStr, idWidth-2) + " " +
+			padRight(truncate(wp.Type, typeWidth), typeWidth) + " " +
+			padRight(truncate(wp.Subject, titleWidth), titleWidth) + " " +
+			padRight(truncate(wp.Status, statusWidth), statusWidth) + " " +
+			padRight(truncate(assigneeOrDash(wp.Assignee), assigneeWidth), assigneeWidth)
+
+		fullLine := prefix + line
+
+		if i == m.selected {
+			b.WriteString(selectedItemStyle.Render(fullLine))
+		} else {
+			b.WriteString(normalItemStyle.Render(fullLine))
+		}
+		b.WriteString("\n")
+	}
+
+	// Footer
+	b.WriteString("\n")
+	pageInfo := fmt.Sprintf("%d-%d / %d",
+		int64(m.page-1)*m.pageSize+1,
+		min(int64(m.page)*m.pageSize, m.total),
+		m.total)
+	b.WriteString(helpStyle.Render(pageInfo))
+
+	// Help bar
+	b.WriteString("\n")
+	b.WriteString(helpStyle.Render("  ↑↓ move  enter open/expand  >/< expand/collapse  t list  / search  f filter  n/p page  ? help  q quit"))
 
 	return b.String()
 }
