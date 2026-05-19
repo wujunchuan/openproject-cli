@@ -46,4 +46,9 @@ var (
 
 	// Layout
 	docStyle = lipgloss.NewStyle().Padding(1, 2, 1, 2)
+
+	helpOverlayStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(highlightColor).
+				Padding(1, 2)
 )

@@ -22,6 +22,7 @@ type filterModel struct {
 	activeField  int
 	visible      bool
 	originalOpts map[work_packages.FilterOption]string
+	showHelp     bool
 }
 
 func newFilterModel() *filterModel {
@@ -73,26 +74,38 @@ func (m *filterModel) Update(msg tea.Msg) tea.Cmd {
 	}
 
 	switch keyMsg.String() {
+	case "?":
+		m.showHelp = !m.showHelp
 	case "tab":
-		m.activeField = (m.activeField + 1) % len(m.fields)
+		if !m.showHelp {
+			m.activeField = (m.activeField + 1) % len(m.fields)
+		}
 	case "shift+tab":
-		m.activeField--
-		if m.activeField < 0 {
-			m.activeField = len(m.fields) - 1
+		if !m.showHelp {
+			m.activeField--
+			if m.activeField < 0 {
+				m.activeField = len(m.fields) - 1
+			}
 		}
 	case "up":
-		field := &m.fields[m.activeField]
-		if field.current > 0 {
-			field.current--
+		if !m.showHelp {
+			field := &m.fields[m.activeField]
+			if field.current > 0 {
+				field.current--
+			}
 		}
 	case "down":
-		field := &m.fields[m.activeField]
-		if field.current < len(field.options)-1 {
-			field.current++
+		if !m.showHelp {
+			field := &m.fields[m.activeField]
+			if field.current < len(field.options)-1 {
+				field.current++
+			}
 		}
 	case "c":
-		for i := range m.fields {
-			m.fields[i].current = 0
+		if !m.showHelp {
+			for i := range m.fields {
+				m.fields[i].current = 0
+			}
 		}
 	}
 	return nil
@@ -118,6 +131,18 @@ func (m *filterModel) FilterOptions() map[work_packages.FilterOption]string {
 }
 
 func (m *filterModel) View() string {
+	if m.showHelp {
+		return helpOverlay("Filter — Key Bindings", [][2]string{
+			{"tab", "next field"},
+			{"shift+tab", "previous field"},
+			{"↑ / ↓", "cycle value"},
+			{"enter", "apply filters"},
+			{"esc", "cancel"},
+			{"c", "clear all filters"},
+			{"?", "toggle this help"},
+		}, 60)
+	}
+
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("Filters"))
 	b.WriteString("\n\n")
@@ -140,6 +165,6 @@ func (m *filterModel) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("  tab/shift+tab field  ↑↓ select  enter apply  esc cancel  c clear"))
+	b.WriteString(helpStyle.Render("  tab/shift+tab field  ↑↓ select  enter apply  esc cancel  c clear  ? help"))
 	return b.String()
 }

@@ -22,7 +22,7 @@ No Makefile or linter config exists — use standard Go toolchain directly.
 
 Layered design with four top-level directories:
 
-- **`cmd/`** — Cobra command definitions. Each subcommand group (`list`, `create`, `update`, `inspect`, `search`, `git`) has its own sub-package with a `RootCmd` variable. Commands parse flags and delegate to `components/` for logic.
+- **`cmd/`** — Cobra command definitions. Each subcommand group (`list`, `create`, `update`, `inspect`, `search`, `git`) has its own sub-package with a `RootCmd` variable. `tui/` is a special sub-package providing an interactive Bubble Tea TUI (`opc tui`). Commands parse flags and delegate to `components/` for logic.
 - **`components/`** — Business logic:
   - `requests/` — HTTP client wrapper. `Init()` sets host/token. `Get`, `Post`, `Patch` wrap `Do()` with a spinner. `Probe()` does non-erroring GET for instance detection.
   - `resources/` — Domain-specific API interaction (e.g., `work_packages/`, `projects/`). Each resource package calls `requests` functions and returns `models`.
@@ -51,11 +51,34 @@ cmd/ → components/resources/ → components/requests/ → OpenProject API
 
 ## Testing
 
-Tests use the standard `testing` package (no third-party frameworks). Printer tests initialize with `TestingPrinter` and assert on the captured string. To run a single test:
+Tests use the standard `testing` package (no third-party frameworks). Printer tests initialize with `TestingPrinter` and assert on the captured string. TUI tests use Bubble Tea's `teatest` approach by calling `Update()` directly on models. To run a single test:
 
 ```bash
 go test -v -run TestName ./components/printer/
+go test -v ./cmd/tui/          # Run all TUI tests
 ```
+
+## TUI (`opc tui`)
+
+Interactive terminal UI built on [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [lipgloss](https://github.com/charmbracelet/lipgloss) + [bubbles](https://github.com/charmbracelet/bubbles). Uses the Elm architecture: `Init` → `Update` → `View`.
+
+### Architecture
+
+- **`cmd/tui/app.go`** — Top-level model, view stack (`listView` ↔ `detailView`), message routing
+- **`cmd/tui/list_view.go`** — Work package list with table, search, sort, pagination, filter overlay
+- **`cmd/tui/detail_view.go`** — Detail view with viewport scroll, properties, activities, edit overlay
+- **`cmd/tui/filter_view.go`** — Filter panel (project, status, type, assignee) loaded from API
+- **`cmd/tui/edit_view.go`** — Edit overlay (type change via `work_packages.Update`)
+- **`cmd/tui/styles.go`** — lipgloss style definitions
+- **`cmd/tui/keymap.go`** — Key binding definitions
+- **`cmd/tui/help_bar.go`** — Bottom help bar and `?` help overlay
+
+### Key patterns
+
+- **Async data loading**: `tea.Cmd` wraps resource calls in goroutines; results delivered as typed `tea.Msg`
+- **Spinner suppression**: TUI calls `printer.SetSilent(true)` to avoid spinner/stdout conflicts
+- **View stack**: `app.go` manages push/pop between list and detail views. Filter and edit are overlays, not separate views.
+- **DTO expansion**: `WorkPackageDto` and `models.WorkPackage` include Priority, Project, Version, CreatedAt, UpdatedAt for the detail view
 
 ## Releases
 

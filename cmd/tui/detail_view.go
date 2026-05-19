@@ -22,6 +22,7 @@ type detailModel struct {
 	loading     bool
 	editOverlay bool
 	edit        *editModel
+	showHelp    bool
 }
 
 func newDetailModel(wp *models.WorkPackage, w, h int) *detailModel {
@@ -142,8 +143,14 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "?":
+			m.showHelp = !m.showHelp
 		case "esc":
-			return m, BackToListCmd()
+			if m.showHelp {
+				m.showHelp = false
+			} else {
+				return m, BackToListCmd()
+			}
 		case "e":
 			m.editOverlay = true
 			m.edit = newEditModel(m.wp, m.width)
@@ -167,9 +174,20 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 }
 
 func (m *detailModel) View() string {
+	if m.showHelp {
+		return helpOverlay("Detail — Key Bindings", [][2]string{
+			{"↑ / ↓", "scroll content"},
+			{"PgUp / PgDn", "scroll page"},
+			{"esc", "back to list"},
+			{"e", "edit (change type)"},
+			{"o", "open in browser"},
+			{"r", "refresh"},
+			{"?", "toggle this help"},
+		}, m.width)
+	}
 	if m.editOverlay {
 		return m.edit.View()
 	}
-	footer := helpStyle.Render("  esc back  e edit  o browser  r refresh")
+	footer := helpStyle.Render("  esc back  e edit  o browser  r refresh  ? help")
 	return m.viewport.View() + "\n" + footer
 }

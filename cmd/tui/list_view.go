@@ -8,8 +8,10 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/opf/openproject-cli/components/launch"
 	"github.com/opf/openproject-cli/components/requests"
 	"github.com/opf/openproject-cli/components/resources/work_packages"
+	"github.com/opf/openproject-cli/components/routes"
 	"github.com/opf/openproject-cli/models"
 )
 
@@ -30,6 +32,7 @@ type listModel struct {
 	sortField     sortField
 	filter        *filterModel
 	filterOverlay bool
+	showHelp      bool
 }
 
 func newListModel() *listModel {
@@ -94,14 +97,24 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 		if m.filterOverlay {
 			switch msg.String() {
 			case "esc":
-				m.filterOverlay = false
+				if m.filter.showHelp {
+					m.filter.showHelp = false
+				} else {
+					m.filterOverlay = false
+				}
+				return m, nil
+			case "?":
+				m.filter.Update(msg)
 				return m, nil
 			case "enter":
-				m.filterOpts = m.filter.FilterOptions()
-				m.filterOverlay = false
-				m.loading = true
-				m.page = 1
-				return m, tea.Batch(m.spinner.Tick, m.loadWorkPackages)
+				if !m.filter.showHelp {
+					m.filterOpts = m.filter.FilterOptions()
+					m.filterOverlay = false
+					m.loading = true
+					m.page = 1
+					return m, tea.Batch(m.spinner.Tick, m.loadWorkPackages)
+				}
+				return m, nil
 			default:
 				m.filter.Update(msg)
 				return m, nil
@@ -135,6 +148,8 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "?":
+			m.showHelp = !m.showHelp
 		case "up", "k":
 			if m.selected > 0 {
 				m.selected--
@@ -170,6 +185,10 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 		case "f":
 			m.filterOverlay = true
 			return m, m.filter.loadOptions()
+		case "o":
+			if m.selected >= 0 && m.selected < len(m.items) {
+				_ = launch.Browser(routes.WorkPackageUrl(m.items[m.selected]))
+			}
 		}
 	}
 
@@ -233,6 +252,23 @@ func (m *listModel) sortItems() {
 }
 
 func (m *listModel) View() string {
+	if m.showHelp {
+		return helpOverlay("List — Key Bindings", [][2]string{
+			{"↑ / k", "move up"},
+			{"↓ / j", "move down"},
+			{"enter", "open detail view"},
+			{"/", "search (client-side)"},
+			{"f", "open filter panel"},
+			{"s", "cycle sort (ID → Status → Type → Assignee)"},
+			{"n", "next page"},
+			{"p", "previous page"},
+			{"r", "refresh"},
+			{"o", "open in browser"},
+			{"?", "toggle this help"},
+			{"q", "quit"},
+		}, m.width)
+	}
+
 	if m.filterOverlay {
 		return m.filter.View()
 	}
@@ -335,7 +371,7 @@ func (m *listModel) View() string {
 
 	// Help bar
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("  ↑↓ move  enter select  / search  f filter  s sort  n/p page  r refresh  q quit"))
+	b.WriteString(helpStyle.Render("  ↑↓ move  enter select  / search  f filter  s sort  n/p page  r refresh  ? help  q quit"))
 
 	return b.String()
 }
