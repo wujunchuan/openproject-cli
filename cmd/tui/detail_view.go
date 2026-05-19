@@ -14,12 +14,14 @@ import (
 )
 
 type detailModel struct {
-	wp         *models.WorkPackage
-	activities []*models.Activity
-	viewport   viewport.Model
-	width      int
-	height     int
-	loading    bool
+	wp          *models.WorkPackage
+	activities  []*models.Activity
+	viewport    viewport.Model
+	width       int
+	height      int
+	loading     bool
+	editOverlay bool
+	edit        *editModel
 }
 
 func newDetailModel(wp *models.WorkPackage, w, h int) *detailModel {
@@ -104,6 +106,37 @@ func (m *detailModel) updateContent() {
 }
 
 func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
+	// Handle edit overlay messages first
+	if m.editOverlay {
+		switch msg := msg.(type) {
+		case editDoneMsg:
+			m.editOverlay = false
+			m.edit = nil
+			if msg.refresh {
+				m.loading = true
+				return m, tea.Batch(
+					func() tea.Msg {
+						wp, err := work_packages.Lookup(m.wp.Id)
+						return workPackageDetailMsg{wp: wp, err: err}
+					},
+					m.loadActivities,
+				)
+			}
+			return m, nil
+		case editOptionsMsg:
+			m.edit.options = msg.options
+			return m, nil
+		case editErrorMsg:
+			m.edit.err = msg.err
+			m.edit.state = editChooseField
+			return m, nil
+		}
+
+		var cmd tea.Cmd
+		m.edit, cmd = m.edit.Update(msg)
+		return m, cmd
+	}
+
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -111,6 +144,10 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 		switch msg.String() {
 		case "esc":
 			return m, BackToListCmd()
+		case "e":
+			m.editOverlay = true
+			m.edit = newEditModel(m.wp, m.width)
+			return m, nil
 		case "o":
 			_ = launch.Browser(routes.WorkPackageUrl(m.wp))
 		case "r":
@@ -130,6 +167,9 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 }
 
 func (m *detailModel) View() string {
+	if m.editOverlay {
+		return m.edit.View()
+	}
 	footer := helpStyle.Render("  esc back  e edit  o browser  r refresh")
 	return m.viewport.View() + "\n" + footer
 }
