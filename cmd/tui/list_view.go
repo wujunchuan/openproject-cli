@@ -20,6 +20,7 @@ import (
 type listModel struct {
 	items         []*models.WorkPackage
 	selected      int
+	scrollOffset  int
 	collection    *models.WorkPackageCollection
 	page          int
 	pageSize      int64
@@ -68,6 +69,7 @@ func (m *listModel) SetWorkPackages(collection *models.WorkPackageCollection) {
 	m.items = collection.Items
 	m.total = collection.Total
 	m.loading = false
+	m.scrollOffset = 0
 	if m.selected >= len(m.items) {
 		m.selected = len(m.items) - 1
 	}
@@ -170,10 +172,12 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 		case "up", "k":
 			if m.selected > 0 {
 				m.selected--
+				m.ensureVisible()
 			}
 		case "down", "j":
 			if m.selected < len(m.items)-1 {
 				m.selected++
+				m.ensureVisible()
 			}
 		case "enter":
 			if m.selected >= 0 && m.selected < len(m.items) {
@@ -218,6 +222,7 @@ func (m *listModel) filterBySearch() {
 		if m.collection != nil {
 			m.items = m.collection.Items
 		}
+		m.scrollOffset = 0
 		return
 	}
 	var filtered []*models.WorkPackage
@@ -232,6 +237,7 @@ func (m *listModel) filterBySearch() {
 	}
 	m.items = filtered
 	m.selected = 0
+	m.scrollOffset = 0
 }
 
 // --- Sort ---
@@ -349,8 +355,14 @@ func (m *listModel) View() string {
 		b.WriteString("\n")
 	b.WriteString("\n")
 
-	// Items
-	for i, wp := range m.items {
+	// Items (viewport: only render visible rows)
+	v := m.visibleItemRows()
+	end := m.scrollOffset + v
+	if end > len(m.items) {
+		end = len(m.items)
+	}
+	for i := m.scrollOffset; i < end; i++ {
+		wp := m.items[i]
 		idStr := fmt.Sprintf("#%d", wp.Id)
 		line := padRight(idStr, idWidth) + " " +
 			padRight(truncate(wp.Type, typeWidth), typeWidth) + " " +
@@ -416,18 +428,52 @@ func assigneeOrDash(s string) string {
 }
 
 func (m *listModel) mouseEventToRow(y int) int {
-	// docStyle top padding: 1 line
-	// title line: 1 line
-	// filter bar: 0 or 1 line
-	// blank line: 1 line
-	// table header: 1 line
-	offset := 4 // top pad + title + blank + header
-	if len(m.filterOpts) > 0 {
-		offset++ // filter bar
-	}
-	row := y - offset
+	offset := m.headerLines()
+	row := y - offset + m.scrollOffset
 	if row < 0 || row >= len(m.items) {
 		return -1
 	}
 	return row
+}
+
+// headerLines returns the number of lines before the first item row.
+func (m *listModel) headerLines() int {
+	lines := 1 // title
+	if len(m.filterOpts) > 0 {
+		lines++ // filter bar
+	}
+	lines += 1 // blank line
+	lines += 2 // table header + bottom border
+	return lines
+}
+
+// footerLines returns the number of lines after the last item row.
+func (m *listModel) footerLines() int {
+	lines := 1 // blank line before footer
+	lines += 1 // page info
+	lines += 1 // help bar
+	if m.searchActive {
+		lines += 2 // search bar
+	}
+	return lines
+}
+
+// visibleItemRows returns how many item rows fit in the terminal.
+func (m *listModel) visibleItemRows() int {
+	// docStyle top+bottom padding = 2
+	v := m.height - 2 - m.headerLines() - m.footerLines()
+	if v < 1 {
+		return 1
+	}
+	return v
+}
+
+// ensureVisible adjusts scrollOffset so the selected item is visible.
+func (m *listModel) ensureVisible() {
+	v := m.visibleItemRows()
+	if m.selected < m.scrollOffset {
+		m.scrollOffset = m.selected
+	} else if m.selected >= m.scrollOffset+v {
+		m.scrollOffset = m.selected - v + 1
+	}
 }
