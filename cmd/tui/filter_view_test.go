@@ -2,6 +2,8 @@ package tui
 
 import (
 	"testing"
+
+	"github.com/opf/openproject-cli/components/resources/work_packages"
 )
 
 func TestFilterModelNavigation(t *testing.T) {
@@ -25,13 +27,15 @@ func TestFilterModelNavigation(t *testing.T) {
 func TestFilterModelValueSelection(t *testing.T) {
 	m := newFilterModel()
 
-	// Status field options: ["all", "open", "closed"]
+	// Status field: open popup and select via enter
 	m.activeField = 1
-	if m.fields[1].current != 0 {
-		t.Fatalf("expected current=0, got %d", m.fields[1].current)
+	m.Update(keyMsg("enter")) // open popup
+	if m.state != filterPopup {
+		t.Fatal("expected filterPopup state")
 	}
 
-	m.Update(keyMsg("l"))
+	m.Update(keyMsg("j")) // move to "open"
+	m.Update(keyMsg("enter")) // select
 	if m.fields[1].current != 1 {
 		t.Fatalf("expected current=1, got %d", m.fields[1].current)
 	}
@@ -52,10 +56,13 @@ func TestFilterModelClear(t *testing.T) {
 		if field.current != 0 {
 			t.Fatalf("expected all fields reset to 0, %s is at %d", field.name, field.current)
 		}
+		if len(field.selected) != 0 {
+			t.Fatalf("expected field %s selected cleared", field.name)
+		}
 	}
 }
 
-func TestFilterModelHJKLNavigation(t *testing.T) {
+func TestFilterModelJKNavigation(t *testing.T) {
 	m := newFilterModel()
 
 	if m.activeField != 0 {
@@ -72,19 +79,6 @@ func TestFilterModelHJKLNavigation(t *testing.T) {
 	m.Update(keyMsg("k"))
 	if m.activeField != 0 {
 		t.Fatalf("expected activeField=0 after k, got %d", m.activeField)
-	}
-
-	// l = next value (right)
-	m.activeField = 1 // Status: ["all", "open", "closed"]
-	m.Update(keyMsg("l"))
-	if m.fields[1].current != 1 {
-		t.Fatalf("expected current=1 after l, got %d", m.fields[1].current)
-	}
-
-	// h = previous value (left)
-	m.Update(keyMsg("h"))
-	if m.fields[1].current != 0 {
-		t.Fatalf("expected current=0 after h, got %d", m.fields[1].current)
 	}
 }
 
@@ -107,7 +101,7 @@ func TestFilterPopupOpenAndSelect(t *testing.T) {
 		t.Fatalf("expected popupIndex=1, got %d", m.popupIndex)
 	}
 
-	// Select
+	// Select (single-select mode: enter selects)
 	m.Update(keyMsg("enter"))
 	if m.state != filterBrowseFields {
 		t.Fatal("expected filterBrowseFields after enter")
@@ -134,33 +128,89 @@ func TestFilterPopupCancel(t *testing.T) {
 	}
 }
 
-func TestFilterAssigneeModeToggle(t *testing.T) {
+func TestFilterMultiSelect(t *testing.T) {
 	m := newFilterModel()
-	m.fields[3].options = []string{"all", "me", "John Smith", "Jane Doe"}
-	m.fields[3].current = 0 // all
-	m.activeField = 3
+	m.fields[1].options = []string{"all", "open", "closed", "in progress"}
+	m.fields[1].ids = []string{"", "open", "closed", "7"}
+	m.fields[1].multi = true
+	m.activeField = 1
 
-	// l on Assignee: all -> me
-	m.Update(keyMsg("l"))
-	if m.fields[3].current != 1 {
-		t.Fatalf("expected current=1 (me), got %d", m.fields[3].current)
+	// Open popup
+	m.Update(keyMsg("enter"))
+
+	// Move to "open" and toggle with space
+	m.Update(keyMsg("j")) // popupIndex=1 (open)
+	m.Update(keyMsg(" ")) // toggle
+
+	if !m.fields[1].selected[1] {
+		t.Fatal("expected 'open' to be selected")
 	}
 
-	// l on Assignee: me -> first user (selected)
-	m.Update(keyMsg("l"))
-	if m.fields[3].current != 2 {
-		t.Fatalf("expected current=2 (selected), got %d", m.fields[3].current)
+	// Move to "in progress" and toggle
+	m.Update(keyMsg("j")) // popupIndex=2 (closed)
+	m.Update(keyMsg("j")) // popupIndex=3 (in progress)
+	m.Update(keyMsg(" ")) // toggle
+
+	if !m.fields[1].selected[3] {
+		t.Fatal("expected 'in progress' to be selected")
+	}
+	if !m.fields[1].selected[1] {
+		t.Fatal("expected 'open' to still be selected")
 	}
 
-	// h on Assignee: selected -> me
-	m.Update(keyMsg("h"))
-	if m.fields[3].current != 1 {
-		t.Fatalf("expected current=1 (me), got %d", m.fields[3].current)
+	// Confirm
+	m.Update(keyMsg("enter"))
+
+	opts := m.FilterOptions()
+	if opts[work_packages.Status] != "7,open" && opts[work_packages.Status] != "open,7" {
+		t.Fatalf("expected '7,open' or 'open,7', got '%s'", opts[work_packages.Status])
+	}
+}
+
+func TestFilterMultiSelectNumberShortcut(t *testing.T) {
+	m := newFilterModel()
+	m.fields[1].options = []string{"all", "open", "closed", "in progress"}
+	m.fields[1].ids = []string{"", "open", "closed", "7"}
+	m.fields[1].multi = true
+	m.activeField = 1
+
+	// Open popup
+	m.Update(keyMsg("enter"))
+
+	// Press "2" to quick-toggle "open" (index 1)
+	m.Update(keyMsg("2"))
+	if !m.fields[1].selected[1] {
+		t.Fatal("expected 'open' selected via number shortcut")
 	}
 
-	// h on Assignee: me -> all
-	m.Update(keyMsg("h"))
-	if m.fields[3].current != 0 {
-		t.Fatalf("expected current=0 (all), got %d", m.fields[3].current)
+	// Press "4" to quick-toggle "in progress" (index 3)
+	m.Update(keyMsg("4"))
+	if !m.fields[1].selected[3] {
+		t.Fatal("expected 'in progress' selected via number shortcut")
+	}
+}
+
+func TestFilterMultiSelectAllClearsSelection(t *testing.T) {
+	m := newFilterModel()
+	m.fields[1].options = []string{"all", "open", "closed"}
+	m.fields[1].ids = []string{"", "open", "closed"}
+	m.fields[1].multi = true
+	m.activeField = 1
+
+	// Open popup, select "open"
+	m.Update(keyMsg("enter"))
+	m.Update(keyMsg("j"))
+	m.Update(keyMsg(" ")) // toggle open
+
+	if !m.fields[1].selected[1] {
+		t.Fatal("expected 'open' selected")
+	}
+
+	// Toggle "all" (index 0) - should clear all
+	m.Update(keyMsg("up")) // go to "all"
+	m.Update(keyMsg(" ")) // toggle all
+
+	if len(m.fields[1].selected) != 0 {
+		t.Fatalf("expected no selection after toggling 'all', got %v", m.fields[1].selected)
 	}
 }

@@ -262,7 +262,7 @@ func TestTreeEnterOnLeafOpensDetail(t *testing.T) {
 	}
 }
 
-func TestTreeEnterOnParentTogglesExpand(t *testing.T) {
+func TestTreeEnterOnParentOpensDetail(t *testing.T) {
 	m := newListModel()
 	m.SetWorkPackages(&models.WorkPackageCollection{
 		Total: 2,
@@ -273,8 +273,38 @@ func TestTreeEnterOnParentTogglesExpand(t *testing.T) {
 	})
 
 	m, _ = m.Update(keyMsg("t"))
-	// Enter on parent should toggle collapse
-	m, _ = m.Update(keyMsg("enter"))
+	// Enter on parent should open detail (not toggle expand)
+	m, cmd := m.Update(keyMsg("enter"))
+	if cmd == nil {
+		t.Fatal("expected detail command on enter")
+	}
+	msg := cmd()
+	detailMsg, ok := msg.(openDetailMsg)
+	if !ok {
+		t.Fatalf("expected openDetailMsg, got %T", msg)
+	}
+	if detailMsg.wp.Id != 1 {
+		t.Fatalf("expected wp id 1, got %d", detailMsg.wp.Id)
+	}
+	// flatNodes should be unchanged (not collapsed)
+	if len(m.flatNodes) != 2 {
+		t.Fatalf("expected 2 nodes (unchanged), got %d", len(m.flatNodes))
+	}
+}
+
+func TestTreeLeftCollapsesParent(t *testing.T) {
+	m := newListModel()
+	m.SetWorkPackages(&models.WorkPackageCollection{
+		Total: 2,
+		Items: []*models.WorkPackage{
+			{Id: 1, Subject: "Parent"},
+			{Id: 2, Subject: "Child", ParentId: 1},
+		},
+	})
+
+	m, _ = m.Update(keyMsg("t"))
+	// < on parent should collapse
+	m, _ = m.Update(keyMsg("<"))
 	if len(m.flatNodes) != 1 {
 		t.Fatalf("expected 1 node after collapsing, got %d", len(m.flatNodes))
 	}

@@ -19,28 +19,29 @@ import (
 )
 
 type listModel struct {
-	items         []*models.WorkPackage
-	selected      int
-	scrollOffset  int
-	collection    *models.WorkPackageCollection
-	page          int
-	pageSize      int64
-	total         int64
-	width         int
-	height        int
-	loading       bool
-	spinner       spinner.Model
-	searchActive  bool
-	searchInput   string
-	filterOpts    map[work_packages.FilterOption]string
-	sortField     sortField
-	filter        *filterModel
-	filterOverlay bool
-	showHelp      bool
-	statusColors  map[string]string
-	treeMode      bool
-	treeRoots     []*treeNode
-	flatNodes     []*treeNode
+	items              []*models.WorkPackage
+	selected           int
+	scrollOffset       int
+	collection         *models.WorkPackageCollection
+	page               int
+	pageSize           int64
+	total              int64
+	width              int
+	height             int
+	loading            bool
+	spinner            spinner.Model
+	searchActive       bool
+	searchInput        string
+	filterOpts         map[work_packages.FilterOption]string
+	filterDisplayNames map[work_packages.FilterOption]string
+	sortField          sortField
+	filter             *filterModel
+	filterOverlay      bool
+	showHelp           bool
+	statusColors       map[string]string
+	treeMode           bool
+	treeRoots          []*treeNode
+	flatNodes          []*treeNode
 }
 
 func newListModel() *listModel {
@@ -53,12 +54,13 @@ func newListModel() *listModel {
 	fm.setFromState(savedFilters)
 
 	return &listModel{
-		loading:    true,
-		pageSize:   50,
-		page:       1,
-		spinner:    s,
-		filterOpts: fm.FilterOptions(),
-		filter:     fm,
+		loading:            true,
+		pageSize:           50,
+		page:               1,
+		spinner:            s,
+		filterOpts:         fm.FilterOptions(),
+		filterDisplayNames: fm.FilterDisplayNames(),
+		filter:             fm,
 	}
 }
 
@@ -139,6 +141,7 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 		}
 	case filterApplyMsg:
 		m.filterOpts = m.filter.FilterOptions()
+		m.filterDisplayNames = m.filter.FilterDisplayNames()
 		configuration.SaveFilters(m.filter.toFilterState())
 		m.filterOverlay = false
 		m.loading = true
@@ -239,26 +242,19 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 					return m, nil
 				case "enter", "l":
 					if m.selected >= 0 && m.selected < len(m.flatNodes) {
-						node := m.flatNodes[m.selected]
-						if node.hasChildren() {
-							node.expanded = !node.expanded
-							m.flatNodes = flatten(m.treeRoots)
-							if m.selected >= len(m.flatNodes) {
-								m.selected = len(m.flatNodes) - 1
-							}
-							return m, nil
-						}
-						return m, OpenDetailCmd(node.item)
+						return m, OpenDetailCmd(m.flatNodes[m.selected].item)
 					}
 					return m, nil
 				case "up", "k":
 					if m.selected > 0 {
 						m.selected--
+						m.ensureVisible()
 					}
 					return m, nil
 				case "down", "j":
 					if m.selected < len(m.flatNodes)-1 {
 						m.selected++
+						m.ensureVisible()
 					}
 					return m, nil
 				case "s":
@@ -406,6 +402,7 @@ func (m *listModel) buildTreeFromItems() {
 	cmp := m.treeSortFunc()
 	m.treeRoots = buildTree(m.items, cmp)
 	m.flatNodes = flatten(m.treeRoots)
+	m.scrollOffset = 0
 	if m.selected >= len(m.flatNodes) {
 		m.selected = len(m.flatNodes) - 1
 	}
@@ -443,7 +440,7 @@ func (m *listModel) View() string {
 		if m.treeMode {
 			bindings = append([][2]string{
 				{"t", "toggle tree/list mode"},
-				{"enter", "expand/collapse or open detail"},
+				{"enter / l", "open detail"},
 				{"> / →", "expand node"},
 				{"< / ←", "collapse node"},
 			}, bindings...)
@@ -644,8 +641,15 @@ func (m *listModel) treeView() string {
 	b.WriteString(headerStyle.Render(headerLine))
 	b.WriteString("\n\n")
 
-	// Render each visible node
-	for i, node := range m.flatNodes {
+	// Render each visible node (viewport clipping)
+	v := m.visibleItemRows()
+	start := m.scrollOffset
+	end := m.scrollOffset + v
+	if end > len(m.flatNodes) {
+		end = len(m.flatNodes)
+	}
+	for i := start; i < end; i++ {
+		node := m.flatNodes[i]
 		// Determine if this node is the last child of its parent
 		isLast := true
 		for j := i + 1; j < len(m.flatNodes); j++ {
@@ -710,7 +714,7 @@ func (m *listModel) treeView() string {
 
 	// Help bar
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("  ↑↓ move  enter open/expand  >/< expand/collapse  t list  / search  f filter  n/p page  ? help  q quit"))
+	b.WriteString(helpStyle.Render("  ↑↓ move  enter/l detail  >/< expand/collapse  t list  / search  f filter  n/p page  ? help  q quit"))
 
 	return b.String()
 }

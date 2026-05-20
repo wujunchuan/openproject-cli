@@ -42,7 +42,7 @@ func AssigneeFilter(name string) requests.Filter {
 	return requests.Filter{
 		Operator: "=",
 		Name:     "assignee",
-		Values:   []string{name},
+		Values:   strings.Split(name, ","),
 	}
 }
 

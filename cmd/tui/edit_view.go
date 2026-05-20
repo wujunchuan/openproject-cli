@@ -102,6 +102,24 @@ func (m *editModel) Update(msg tea.Msg) (*editModel, tea.Cmd) {
 			m.options = nil
 			m.err = ""
 			return m, nil
+		default:
+			// Number shortcuts: 1-9 for quick selection
+			if len(keyMsg.String()) == 1 {
+				ch := keyMsg.String()[0]
+				if ch >= '1' && ch <= '9' {
+					idx := int(ch - '1')
+					if idx < len(m.options) {
+						m.optionIndex = idx
+						m.state = editSubmitting
+						switch m.activeField {
+						case "status":
+							return m, m.submitStatus
+						default:
+							return m, m.submitType
+						}
+					}
+				}
+			}
 		}
 
 	case editTextInput:
@@ -224,17 +242,18 @@ func (m *editModel) View() string {
 	case editChooseValue:
 		b.WriteString(fmt.Sprintf("  Select %s:\n\n", fieldLabel(m.activeField)))
 		for i, opt := range m.options {
+			numPrefix := fmt.Sprintf("%d ", i+1)
 			prefix := "  "
 			if i == m.optionIndex {
 				prefix = "▸ "
-				b.WriteString(selectedItemStyle.Render(prefix + opt))
+				b.WriteString(selectedItemStyle.Render(prefix + numPrefix + opt))
 			} else {
-				b.WriteString(normalItemStyle.Render(prefix + opt))
+				b.WriteString(normalItemStyle.Render(prefix + numPrefix + opt))
 			}
 			b.WriteString("\n")
 		}
 		b.WriteString("\n")
-		b.WriteString(helpStyle.Render("  ↑↓ select  enter confirm  esc back"))
+		b.WriteString(helpStyle.Render("  ↑↓ select  1-9 quick pick  enter confirm  esc back"))
 	case editTextInput:
 		b.WriteString(fmt.Sprintf("  %s:\n\n", fieldLabel(m.activeField)))
 		b.WriteString("  " + m.textInput.View() + "\n\n")
