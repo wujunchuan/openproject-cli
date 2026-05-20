@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/opf/openproject-cli/components/configuration"
 	"github.com/opf/openproject-cli/models"
 )
 
@@ -32,7 +33,7 @@ func printActivityHeadline(activity *models.Activity, user *models.User) {
 		parts = append(parts, Green(user.Name))
 	}
 
-	parts = append(parts, Yellow(activity.UpdatedAt))
+	parts = append(parts, Yellow(configuration.FormatTime(activity.UpdatedAt)))
 
 	activePrinter.Println(strings.Join(parts, " "))
 }

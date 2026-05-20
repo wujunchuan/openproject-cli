@@ -13,6 +13,15 @@ type FilterState struct {
 	Status   string `json:"status"`
 	Type     string `json:"type"`
 	Assignee string `json:"assignee"`
+	Timezone string `json:"timezone"`
+}
+
+func Timezone() string {
+	fs, err := LoadFilters()
+	if err != nil || fs.Timezone == "" {
+		return "Asia/Shanghai"
+	}
+	return fs.Timezone
 }
 
 func filterFilePath() string {

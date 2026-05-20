@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/opf/openproject-cli/components/configuration"
 	"github.com/opf/openproject-cli/components/launch"
 	"github.com/opf/openproject-cli/components/resources/work_packages"
 	"github.com/opf/openproject-cli/components/routes"
@@ -74,7 +75,7 @@ func (m *detailModel) updateContent() {
 	right := fmt.Sprintf("Priority: %s\nVersion: %s\nStart: %s\nDue: %s\nCreated: %s\nUpdated: %s",
 		m.wp.Priority, m.wp.Version,
 		dateOrDash(m.wp.StartDate), dateOrDash(m.wp.DueDate),
-		m.wp.CreatedAt, m.wp.UpdatedAt)
+		configuration.FormatTime(m.wp.CreatedAt), configuration.FormatTime(m.wp.UpdatedAt))
 
 	leftCol := lipgloss.NewStyle().Width(m.width/2 - 4).Render(left)
 	rightCol := lipgloss.NewStyle().Width(m.width/2 - 4).Render(right)
@@ -97,7 +98,7 @@ func (m *detailModel) updateContent() {
 		b.WriteString("\n  Loading activities...\n")
 	} else {
 		for _, act := range m.activities {
-			b.WriteString(fmt.Sprintf("\n  %s\n", subtitleStyle.Render(act.CreatedAt)))
+			b.WriteString(fmt.Sprintf("\n  %s\n", subtitleStyle.Render(configuration.FormatTime(act.CreatedAt))))
 			for _, detail := range act.Details {
 				if detail != nil {
 					b.WriteString(fmt.Sprintf("  %s\n", *detail))
