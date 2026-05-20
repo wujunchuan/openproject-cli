@@ -22,10 +22,23 @@ type RequestData struct {
 }
 
 func Init(hostUrl *url.URL, tokenValue string, verboseFlag bool) {
-	client = &http.Client{}
+	client = &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
 	host = hostUrl
 	token = tokenValue
 	verbose = verboseFlag
+
+	if verbose {
+		proxyURL, _ := http.ProxyFromEnvironment(&http.Request{URL: hostUrl})
+		if proxyURL != nil {
+			printer.Debug(true, fmt.Sprintf("Using proxy: %s", proxyURL.String()))
+		} else {
+			printer.Debug(true, "No proxy configured for this host")
+		}
+	}
 }
 
 func Get(path string, query *Query) (responseBody []byte, err error) {
