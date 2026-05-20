@@ -659,18 +659,29 @@ func (m *listModel) treeView() string {
 
 		wp := node.item
 		idStr := fmt.Sprintf("#%d", wp.Id)
-		line := marker + padRight(idStr, idWidth-2) + " " +
-			padRight(truncate(wp.Type, typeWidth), typeWidth) + " " +
-			padRight(truncate(wp.Subject, titleWidth), titleWidth) + " " +
-			padRight(truncate(wp.Status, statusWidth), statusWidth) + " " +
-			padRight(truncate(assigneeOrDash(wp.Assignee), assigneeWidth), assigneeWidth)
-
-		fullLine := prefix + line
+		colID := padRight(idStr, idWidth-2)
+		colType := padRight(truncate(wp.Type, typeWidth), typeWidth)
+		colTitle := padRight(truncate(wp.Subject, titleWidth), titleWidth)
+		colStatus := padRight(truncate(wp.Status, statusWidth), statusWidth)
+		colAssignee := padRight(truncate(assigneeOrDash(wp.Assignee), assigneeWidth), assigneeWidth)
 
 		if i == m.selected {
-			b.WriteString(selectedItemStyle.Render(fullLine))
+			fullLine := marker + selectedItemStyle.Render(colID) + " " +
+				selectedItemStyle.Render(colType) + " " +
+				selectedItemStyle.Render(colTitle) + " " +
+				selectedItemStyle.Render(colStatus) + " " +
+				selectedItemStyle.Render(colAssignee)
+			b.WriteString(selectedItemStyle.Render(prefix) + fullLine)
 		} else {
-			b.WriteString(normalItemStyle.Render(fullLine))
+			if hex, ok := m.statusColors[wp.Status]; ok {
+				colStatus = statusColorStyle(hex).Render(colStatus)
+			}
+			fullLine := marker + normalItemStyle.Render(colID) + " " +
+				normalItemStyle.Render(colType) + " " +
+				normalItemStyle.Render(colTitle) + " " +
+				colStatus + " " +
+				normalItemStyle.Render(colAssignee)
+			b.WriteString(normalItemStyle.Render(prefix) + fullLine)
 		}
 		b.WriteString("\n")
 	}
