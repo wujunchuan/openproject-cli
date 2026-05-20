@@ -237,7 +237,7 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 						}
 					}
 					return m, nil
-				case "enter":
+				case "enter", "l":
 					if m.selected >= 0 && m.selected < len(m.flatNodes) {
 						node := m.flatNodes[m.selected]
 						if node.hasChildren() {
@@ -250,6 +250,7 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 						}
 						return m, OpenDetailCmd(node.item)
 					}
+					return m, nil
 				case "up", "k":
 					if m.selected > 0 {
 						m.selected--
@@ -314,14 +315,27 @@ func (m *listModel) Update(msg tea.Msg) (*listModel, tea.Cmd) {
 			m.filterOverlay = true
 			return m, m.filter.loadOptions()
 		case "o":
-			if m.selected >= 0 && m.selected < len(m.items) {
+			if m.treeMode {
+				if m.selected >= 0 && m.selected < len(m.flatNodes) {
+					_ = launch.Browser(routes.WorkPackageUrl(m.flatNodes[m.selected].item))
+				}
+			} else if m.selected >= 0 && m.selected < len(m.items) {
 				_ = launch.Browser(routes.WorkPackageUrl(m.items[m.selected]))
 			}
 		case "c":
-			if !m.searchActive && !m.filterOverlay && len(m.items) > 0 {
-				selected := m.items[m.selected]
-				return m, func() tea.Msg {
-					return copyIdMsg{id: selected.Id}
+			if !m.searchActive && !m.filterOverlay {
+				var selected *models.WorkPackage
+				if m.treeMode {
+					if m.selected >= 0 && m.selected < len(m.flatNodes) {
+						selected = m.flatNodes[m.selected].item
+					}
+				} else if m.selected >= 0 && m.selected < len(m.items) {
+					selected = m.items[m.selected]
+				}
+				if selected != nil {
+					return m, func() tea.Msg {
+						return copyIdMsg{id: selected.Id}
+					}
 				}
 			}
 		}
