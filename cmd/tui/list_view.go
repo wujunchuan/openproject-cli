@@ -562,7 +562,7 @@ func (m *listModel) View() string {
 		to = m.total
 	}
 	pageInfo := fmt.Sprintf("%d-%d / %d", from, to, m.total)
-	b.WriteString(helpStyle.Render(pageInfo))
+	b.WriteString(pageInfoStyle.Render(pageInfo))
 
 	// Search bar
 	if m.searchActive {
@@ -710,7 +710,7 @@ func (m *listModel) treeView() string {
 		int64(m.page-1)*m.pageSize+1,
 		min(int64(m.page)*m.pageSize, m.total),
 		m.total)
-	b.WriteString(helpStyle.Render(pageInfo))
+	b.WriteString(pageInfoStyle.Render(pageInfo))
 
 	// Help bar
 	b.WriteString("\n")

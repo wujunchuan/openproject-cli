@@ -4,7 +4,7 @@ import "github.com/charmbracelet/lipgloss"
 
 var (
 	// Colors
-	subtleColor    = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
+	subtleColor    = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#777777"}
 	highlightColor = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
 	specialColor   = lipgloss.AdaptiveColor{Light: "#43BF6D", Dark: "#73F59F"}
 	errorColor     = lipgloss.Color("#F25D94")
@@ -33,6 +33,10 @@ var (
 
 	helpStyle = lipgloss.NewStyle().
 			Foreground(subtleColor)
+
+	pageInfoStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#AAAAAA")).
+			Bold(true)
 
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
