@@ -116,3 +116,184 @@ func TestDetailModelFamilyTreeRendersTree(t *testing.T) {
 		t.Fatal("expected '←' marker on current WP")
 	}
 }
+
+func TestDetailModelFamilyTreeCursorInit(t *testing.T) {
+	parent := &models.WorkPackage{Id: 10, Subject: "Parent WP"}
+	m := newDetailModel(&models.WorkPackage{Id: 12, Subject: "Child 2", ParentId: 10}, 80, 24)
+	children := []*models.WorkPackage{
+		{Id: 11, Subject: "Child 1", Status: "Open", ParentId: 10},
+		{Id: 12, Subject: "Child 2", Status: "Open", ParentId: 10},
+		{Id: 13, Subject: "Child 3", Status: "Open", ParentId: 10},
+	}
+	m.SetFamilyTree(parent, children)
+
+	// Cursor should be on current WP (id=12, index 2 in flat: 0=parent, 1=child1, 2=child2)
+	if m.familyCursor != 2 {
+		t.Fatalf("expected cursor=2 (current WP), got %d", m.familyCursor)
+	}
+}
+
+func TestDetailModelFamilyTreeNavigation(t *testing.T) {
+	parent := &models.WorkPackage{Id: 10, Subject: "Parent WP"}
+	m := newDetailModel(&models.WorkPackage{Id: 11, Subject: "Child 1", ParentId: 10}, 80, 24)
+	children := []*models.WorkPackage{
+		{Id: 11, Subject: "Child 1", Status: "Open", ParentId: 10},
+		{Id: 12, Subject: "Child 2", Status: "Open", ParentId: 10},
+		{Id: 13, Subject: "Child 3", Status: "Open", ParentId: 10},
+	}
+	m.SetFamilyTree(parent, children)
+
+	// Initial: cursor on current WP (index 1)
+	if m.familyCursor != 1 {
+		t.Fatalf("expected cursor=1, got %d", m.familyCursor)
+	}
+
+	// Focus the tree
+	m.Update(keyMsg("tab"))
+	if !m.familyFocused {
+		t.Fatal("expected familyFocused=true after tab")
+	}
+
+	// j moves down
+	m.Update(keyMsg("j"))
+	if m.familyCursor != 2 {
+		t.Fatalf("expected cursor=2 after j, got %d", m.familyCursor)
+	}
+
+	// j moves down
+	m.Update(keyMsg("j"))
+	if m.familyCursor != 3 {
+		t.Fatalf("expected cursor=3 after j, got %d", m.familyCursor)
+	}
+
+	// j at end should not move
+	m.Update(keyMsg("j"))
+	if m.familyCursor != 3 {
+		t.Fatalf("expected cursor=3 (end), got %d", m.familyCursor)
+	}
+
+	// k moves up
+	m.Update(keyMsg("k"))
+	if m.familyCursor != 2 {
+		t.Fatalf("expected cursor=2 after k, got %d", m.familyCursor)
+	}
+}
+
+func TestDetailModelFamilyTreeEnterOpensDetail(t *testing.T) {
+	parent := &models.WorkPackage{Id: 10, Subject: "Parent WP"}
+	current := &models.WorkPackage{Id: 11, Subject: "Child 1", ParentId: 10}
+	m := newDetailModel(current, 80, 24)
+	children := []*models.WorkPackage{
+		{Id: 11, Subject: "Child 1", Status: "Open", ParentId: 10},
+		{Id: 12, Subject: "Child 2", Status: "Closed", ParentId: 10},
+	}
+	m.SetFamilyTree(parent, children)
+
+	// Focus and move to child 2
+	m.Update(keyMsg("tab"))
+	m.Update(keyMsg("j"))
+
+	// l should open detail
+	_, cmd := m.Update(keyMsg("l"))
+	if cmd == nil {
+		t.Fatal("l should return a command")
+	}
+	msg := cmd()
+	openMsg, ok := msg.(openDetailMsg)
+	if !ok {
+		t.Fatalf("expected openDetailMsg, got %T", msg)
+	}
+	if openMsg.wp.Id != 12 {
+		t.Fatalf("expected id 12, got %d", openMsg.wp.Id)
+	}
+}
+
+func TestDetailModelFamilyTreeEnterOnCurrentWPNoop(t *testing.T) {
+	parent := &models.WorkPackage{Id: 10, Subject: "Parent WP"}
+	m := newDetailModel(&models.WorkPackage{Id: 11, Subject: "Child 1", ParentId: 10}, 80, 24)
+	children := []*models.WorkPackage{
+		{Id: 11, Subject: "Child 1", Status: "Open", ParentId: 10},
+		{Id: 12, Subject: "Child 2", Status: "Open", ParentId: 10},
+	}
+	m.SetFamilyTree(parent, children)
+
+	// Focus — cursor is on current WP (index 1)
+	m.Update(keyMsg("tab"))
+	_, cmd := m.Update(keyMsg("l"))
+	if cmd != nil {
+		t.Fatal("l on current WP should return nil command")
+	}
+}
+
+func TestDetailModelFamilyTreeEnterOnParentNoop(t *testing.T) {
+	parent := &models.WorkPackage{Id: 10, Subject: "Parent WP"}
+	m := newDetailModel(&models.WorkPackage{Id: 11, Subject: "Child 1", ParentId: 10}, 80, 24)
+	children := []*models.WorkPackage{
+		{Id: 11, Subject: "Child 1", Status: "Open", ParentId: 10},
+	}
+	m.SetFamilyTree(parent, children)
+
+	// Focus, move cursor to parent (index 0)
+	m.Update(keyMsg("tab"))
+	m.Update(keyMsg("k"))
+
+	// l on parent (has children) should do nothing
+	_, cmd := m.Update(keyMsg("l"))
+	if cmd != nil {
+		t.Fatal("l on parent node should return nil command")
+	}
+}
+
+func TestDetailModelFamilyTreeTabToggleFocus(t *testing.T) {
+	parent := &models.WorkPackage{Id: 10, Subject: "Parent WP"}
+	m := newDetailModel(&models.WorkPackage{Id: 11, Subject: "Child 1", ParentId: 10}, 80, 24)
+	children := []*models.WorkPackage{
+		{Id: 11, Subject: "Child 1", Status: "Open", ParentId: 10},
+		{Id: 12, Subject: "Child 2", Status: "Open", ParentId: 10},
+	}
+	m.SetFamilyTree(parent, children)
+
+	// Initially not focused
+	if m.familyFocused {
+		t.Fatal("expected familyFocused=false initially")
+	}
+
+	// Tab focuses
+	m.Update(keyMsg("tab"))
+	if !m.familyFocused {
+		t.Fatal("expected familyFocused=true after tab")
+	}
+
+	// Tab unfocuses
+	m.Update(keyMsg("tab"))
+	if m.familyFocused {
+		t.Fatal("expected familyFocused=false after second tab")
+	}
+}
+
+func TestDetailModelFamilyTreeUnfocusedJNoop(t *testing.T) {
+	parent := &models.WorkPackage{Id: 10, Subject: "Parent WP"}
+	m := newDetailModel(&models.WorkPackage{Id: 11, Subject: "Child 1", ParentId: 10}, 80, 24)
+	children := []*models.WorkPackage{
+		{Id: 11, Subject: "Child 1", Status: "Open", ParentId: 10},
+		{Id: 12, Subject: "Child 2", Status: "Open", ParentId: 10},
+	}
+	m.SetFamilyTree(parent, children)
+
+	cursor := m.familyCursor
+	// Without focus, j should not change cursor
+	m.Update(keyMsg("j"))
+	if m.familyCursor != cursor {
+		t.Fatalf("j without focus should not move cursor, expected %d got %d", cursor, m.familyCursor)
+	}
+}
+
+func TestDetailModelTabWithoutTreeNoop(t *testing.T) {
+	m := newDetailModel(&models.WorkPackage{Id: 1, Subject: "No Children"}, 80, 24)
+	// No family tree set
+
+	m.Update(keyMsg("tab"))
+	if m.familyFocused {
+		t.Fatal("tab without tree should not focus")
+	}
+}

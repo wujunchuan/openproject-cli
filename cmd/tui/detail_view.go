@@ -16,28 +16,31 @@ import (
 )
 
 type detailModel struct {
-	wp           *models.WorkPackage
-	activities   []*models.Activity
-	viewport     viewport.Model
-	width        int
-	height       int
-	loading      bool
-	editOverlay  bool
-	edit         *editModel
-	showHelp     bool
-	familyRoots  []*treeNode
-	familyFlat   []*treeNode
+	wp            *models.WorkPackage
+	activities    []*models.Activity
+	viewport      viewport.Model
+	width         int
+	height        int
+	loading       bool
+	editOverlay   bool
+	edit          *editModel
+	showHelp      bool
+	familyRoots   []*treeNode
+	familyFlat    []*treeNode
+	familyCursor  int  // selected node index in familyFlat (-1 = none)
+	familyFocused bool // whether the children tree has focus
 }
 
 func newDetailModel(wp *models.WorkPackage, w, h int) *detailModel {
 	vp := viewport.New(w-4, h-10)
 	vp.SetContent("")
 	return &detailModel{
-		wp:       wp,
-		viewport: vp,
-		width:    w,
-		height:   h,
-		loading:  true,
+		wp:           wp,
+		viewport:     vp,
+		width:        w,
+		height:       h,
+		loading:      true,
+		familyCursor: -1,
 	}
 }
 
@@ -85,6 +88,7 @@ func (m *detailModel) loadFamilyTree() tea.Msg {
 
 func (m *detailModel) SetFamilyTree(parent *models.WorkPackage, children []*models.WorkPackage) {
 	m.familyRoots = nil
+	m.familyCursor = -1
 	if parent == nil || len(children) == 0 {
 		m.familyFlat = nil
 		m.updateContent()
@@ -106,6 +110,17 @@ func (m *detailModel) SetFamilyTree(parent *models.WorkPackage, children []*mode
 	}
 	m.familyRoots = []*treeNode{root}
 	m.familyFlat = flatten(m.familyRoots)
+
+	// Position cursor on current WP if found, otherwise first child
+	for i, node := range m.familyFlat {
+		if node.item.Id == m.wp.Id && node.depth > 0 {
+			m.familyCursor = i
+			break
+		}
+	}
+	if m.familyCursor < 0 && len(m.familyFlat) > 1 {
+		m.familyCursor = 1
+	}
 	m.updateContent()
 }
 
@@ -144,7 +159,11 @@ func (m *detailModel) updateContent() {
 
 	// Children (tree)
 	if len(m.familyRoots) > 0 {
-		b.WriteString(headerStyle.Render("Children"))
+		childrenLabel := "Children"
+		if m.familyFocused {
+			childrenLabel = "Children [focused]"
+		}
+		b.WriteString(headerStyle.Render(childrenLabel))
 		b.WriteString("\n")
 		for i, node := range m.familyFlat {
 			ancestorsLast := computeAncestorsLast(m.familyFlat, i)
@@ -162,12 +181,9 @@ func (m *detailModel) updateContent() {
 			}
 			prefix := treeLinePrefix(node.depth, isLast, ancestorsLast)
 
+			var line string
 			if node.hasChildren() {
-				icon := "▼ "
-				if node.item.Id == m.wp.Id {
-					icon = "▶ "
-				}
-				b.WriteString(fmt.Sprintf("%s%s#%d %s\n", prefix, icon, node.item.Id, node.item.Subject))
+				line = fmt.Sprintf("%s▼ #%d %s", prefix, node.item.Id, node.item.Subject)
 			} else {
 				statusStr := node.item.Status
 				if node.item.StatusColor != "" {
@@ -177,8 +193,15 @@ func (m *detailModel) updateContent() {
 				if node.item.Id == m.wp.Id {
 					marker = " ←"
 				}
-				b.WriteString(fmt.Sprintf("%s#%d %s [%s]%s\n", prefix, node.item.Id, node.item.Subject, statusStr, marker))
+				line = fmt.Sprintf("%s#%d %s [%s]%s", prefix, node.item.Id, node.item.Subject, statusStr, marker)
 			}
+
+			if i == m.familyCursor {
+				b.WriteString(selectedItemStyle.Render(line))
+			} else {
+				b.WriteString(line)
+			}
+			b.WriteString("\n")
 		}
 		b.WriteString("\n")
 	}
@@ -271,6 +294,36 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 				m.loadActivities,
 				m.loadFamilyTree,
 			)
+		case "tab":
+			if len(m.familyFlat) > 0 {
+				m.familyFocused = !m.familyFocused
+				m.updateContent()
+				if m.familyFocused {
+					m.scrollFamilyCursor()
+				}
+				return m, nil
+			}
+		case "j", "down":
+			if m.familyFocused && m.familyCursor >= 0 && m.familyCursor < len(m.familyFlat)-1 {
+				m.familyCursor++
+				m.updateContent()
+				m.scrollFamilyCursor()
+				return m, nil
+			}
+		case "k", "up":
+			if m.familyFocused && m.familyCursor > 0 {
+				m.familyCursor--
+				m.updateContent()
+				m.scrollFamilyCursor()
+				return m, nil
+			}
+		case "l", "enter":
+			if m.familyFocused && m.familyCursor >= 0 && m.familyCursor < len(m.familyFlat) {
+				node := m.familyFlat[m.familyCursor]
+				if !node.hasChildren() && node.item.Id != m.wp.Id {
+					return m, OpenDetailCmd(node.item)
+				}
+			}
 		}
 	}
 
@@ -278,9 +331,45 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 	return m, cmd
 }
 
+// scrollFamilyCursor scrolls the viewport so the selected family tree node is visible.
+func (m *detailModel) scrollFamilyCursor() {
+	if m.familyCursor < 0 || m.familyCursor >= len(m.familyFlat) {
+		return
+	}
+
+	// Count lines before the Children section
+	linesBefore := 2 // header + blank
+	// Properties: max(leftLines, rightLines) lines
+	leftLines := strings.Count("Type: \nStatus: \nProject: \nAssignee: ", "\n") + 1
+	rightLines := strings.Count("Priority: \nVersion: \nStart: \nDue: \nCreated: \nUpdated: ", "\n") + 1
+	if leftLines > rightLines {
+		linesBefore += leftLines
+	} else {
+		linesBefore += rightLines
+	}
+	linesBefore++ // blank after properties
+	if m.wp.Description != "" {
+		linesBefore += 2 + strings.Count(m.wp.Description, "\n") + 1 + 1
+	}
+	linesBefore++ // "Children" header
+
+	targetLine := linesBefore + m.familyCursor
+	visibleLines := m.viewport.VisibleLineCount()
+	currentTop := m.viewport.YOffset
+
+	if targetLine < currentTop {
+		m.viewport.SetYOffset(targetLine)
+	} else if targetLine >= currentTop+visibleLines {
+		m.viewport.SetYOffset(targetLine - visibleLines + 1)
+	}
+}
+
 func (m *detailModel) View() string {
 	if m.showHelp {
-		return helpOverlay("Detail — Key Bindings", [][2]string{
+		bindings := [][2]string{
+			{"tab", "focus / unfocus children tree"},
+			{"j / k", "select child item (when focused)"},
+			{"l / enter", "open selected item (when focused)"},
 			{"↑ / ↓", "scroll content"},
 			{"PgUp / PgDn", "scroll page"},
 			{"esc", "back to list"},
@@ -289,12 +378,13 @@ func (m *detailModel) View() string {
 			{"o", "open in browser"},
 			{"r", "refresh"},
 			{"?", "toggle this help"},
-		}, m.width)
+		}
+		return helpOverlay("Detail — Key Bindings", bindings, m.width)
 	}
 	if m.editOverlay {
 		return m.edit.View()
 	}
-	footer := helpStyle.Render("  esc back  c copy  e edit  o browser  r refresh  ? help")
+	footer := helpStyle.Render("  tab focus tree  esc back  c copy  e edit  o browser  r refresh  ? help")
 	return m.viewport.View() + "\n" + footer
 }
 
