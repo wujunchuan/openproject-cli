@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -15,15 +16,17 @@ import (
 )
 
 type detailModel struct {
-	wp          *models.WorkPackage
-	activities  []*models.Activity
-	viewport    viewport.Model
-	width       int
-	height      int
-	loading     bool
-	editOverlay bool
-	edit        *editModel
-	showHelp    bool
+	wp           *models.WorkPackage
+	activities   []*models.Activity
+	viewport     viewport.Model
+	width        int
+	height       int
+	loading      bool
+	editOverlay  bool
+	edit         *editModel
+	showHelp     bool
+	familyRoots  []*treeNode
+	familyFlat   []*treeNode
 }
 
 func newDetailModel(wp *models.WorkPackage, w, h int) *detailModel {
@@ -39,7 +42,7 @@ func newDetailModel(wp *models.WorkPackage, w, h int) *detailModel {
 }
 
 func (m *detailModel) Init() tea.Cmd {
-	return m.loadActivities
+	return tea.Batch(m.loadActivities, m.loadFamilyTree)
 }
 
 func (m *detailModel) SetWorkPackage(wp *models.WorkPackage) {
@@ -56,6 +59,54 @@ func (m *detailModel) SetActivities(activities []*models.Activity) {
 func (m *detailModel) loadActivities() tea.Msg {
 	activities, err := work_packages.Activities(m.wp.Id)
 	return activitiesLoadedMsg{activities: activities, err: err}
+}
+
+func (m *detailModel) loadFamilyTree() tea.Msg {
+	if m.wp.ParentId != 0 {
+		// Current WP has a parent — fetch parent + all siblings
+		parent, err := work_packages.Lookup(m.wp.ParentId)
+		if err != nil {
+			return familyTreeLoadedMsg{}
+		}
+		siblings, err := work_packages.Children(m.wp.ParentId)
+		if err != nil {
+			return familyTreeLoadedMsg{}
+		}
+		return familyTreeLoadedMsg{parent: parent, children: siblings}
+	}
+
+	// No parent — fetch children of current WP
+	children, err := work_packages.Children(m.wp.Id)
+	if err != nil {
+		return familyTreeLoadedMsg{}
+	}
+	return familyTreeLoadedMsg{parent: m.wp, children: children}
+}
+
+func (m *detailModel) SetFamilyTree(parent *models.WorkPackage, children []*models.WorkPackage) {
+	m.familyRoots = nil
+	if parent == nil || len(children) == 0 {
+		m.familyFlat = nil
+		m.updateContent()
+		return
+	}
+
+	root := &treeNode{
+		item:     parent,
+		expanded: true,
+		depth:    0,
+	}
+	sort.Slice(children, func(i, j int) bool { return children[i].Id < children[j].Id })
+	for _, child := range children {
+		root.children = append(root.children, &treeNode{
+			item:     child,
+			expanded: true,
+			depth:    1,
+		})
+	}
+	m.familyRoots = []*treeNode{root}
+	m.familyFlat = flatten(m.familyRoots)
+	m.updateContent()
 }
 
 func (m *detailModel) updateContent() {
@@ -89,6 +140,47 @@ func (m *detailModel) updateContent() {
 		b.WriteString("\n")
 		b.WriteString(m.wp.Description)
 		b.WriteString("\n\n")
+	}
+
+	// Children (tree)
+	if len(m.familyRoots) > 0 {
+		b.WriteString(headerStyle.Render("Children"))
+		b.WriteString("\n")
+		for i, node := range m.familyFlat {
+			ancestorsLast := computeAncestorsLast(m.familyFlat, i)
+			isLast := true
+			if i+1 < len(m.familyFlat) {
+				for j := i + 1; j < len(m.familyFlat); j++ {
+					if m.familyFlat[j].depth == node.depth {
+						isLast = false
+						break
+					}
+					if m.familyFlat[j].depth < node.depth {
+						break
+					}
+				}
+			}
+			prefix := treeLinePrefix(node.depth, isLast, ancestorsLast)
+
+			if node.hasChildren() {
+				icon := "▼ "
+				if node.item.Id == m.wp.Id {
+					icon = "▶ "
+				}
+				b.WriteString(fmt.Sprintf("%s%s#%d %s\n", prefix, icon, node.item.Id, node.item.Subject))
+			} else {
+				statusStr := node.item.Status
+				if node.item.StatusColor != "" {
+					statusStr = statusColorStyle(node.item.StatusColor).Render(node.item.Status)
+				}
+				marker := ""
+				if node.item.Id == m.wp.Id {
+					marker = " ←"
+				}
+				b.WriteString(fmt.Sprintf("%s#%d %s [%s]%s\n", prefix, node.item.Id, node.item.Subject, statusStr, marker))
+			}
+		}
+		b.WriteString("\n")
 	}
 
 	// Activities
@@ -128,6 +220,7 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 						return workPackageDetailMsg{wp: wp, err: err}
 					},
 					m.loadActivities,
+					m.loadFamilyTree,
 				)
 			}
 			return m, nil
@@ -176,6 +269,7 @@ func (m *detailModel) Update(msg tea.Msg) (*detailModel, tea.Cmd) {
 					return workPackageDetailMsg{wp: wp, err: err}
 				},
 				m.loadActivities,
+				m.loadFamilyTree,
 			)
 		}
 	}

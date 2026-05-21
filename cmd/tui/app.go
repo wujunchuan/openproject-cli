@@ -34,6 +34,11 @@ type activitiesLoadedMsg struct {
 	err        error
 }
 
+type familyTreeLoadedMsg struct {
+	parent   *models.WorkPackage
+	children []*models.WorkPackage
+}
+
 type errorMsg struct {
 	err error
 }
@@ -131,6 +136,17 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.detail != nil {
 				a.detail.SetActivities(msg.activities)
 			}
+		}
+		return a, nil
+
+	case familyTreeLoadedMsg:
+		if a.detail != nil {
+			for _, child := range msg.children {
+				if hex, ok := a.list.statusColors[child.Status]; ok {
+					child.StatusColor = hex
+				}
+			}
+			a.detail.SetFamilyTree(msg.parent, msg.children)
 		}
 		return a, nil
 
