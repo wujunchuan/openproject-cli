@@ -39,6 +39,7 @@ type listModel struct {
 	filterOverlay      bool
 	showHelp           bool
 	statusColors       map[string]string
+	assigneeHighlights map[string]string
 	treeMode           bool
 	treeRoots          []*treeNode
 	flatNodes          []*treeNode
@@ -53,6 +54,8 @@ func newListModel() *listModel {
 	savedFilters, _ := configuration.LoadFilters()
 	fm.setFromState(savedFilters)
 
+	highlights, _ := configuration.LoadAssigneeHighlights()
+
 	return &listModel{
 		loading:            true,
 		pageSize:           50,
@@ -61,6 +64,7 @@ func newListModel() *listModel {
 		filterOpts:         fm.FilterOptions(),
 		filterDisplayNames: fm.FilterDisplayNames(),
 		filter:             fm,
+		assigneeHighlights: highlights,
 	}
 }
 
@@ -545,11 +549,15 @@ func (m *listModel) View() string {
 			if hex, ok := m.statusColors[wp.Status]; ok {
 				colStatus = statusColorStyle(hex).Render(colStatus)
 			}
+			renderedAssignee := normalItemStyle.Render(colAssignee)
+			if hex, ok := m.assigneeHighlights[wp.Assignee]; ok {
+				renderedAssignee = assigneeColorStyle(hex).Render(colAssignee)
+			}
 			b.WriteString(normalItemStyle.Render(colID) + " " +
 				normalItemStyle.Render(colType) + " " +
 				normalItemStyle.Render(colTitle) + " " +
 				colStatus + " " +
-				normalItemStyle.Render(colAssignee))
+				renderedAssignee)
 		}
 		b.WriteString("\n")
 	}
@@ -694,11 +702,15 @@ func (m *listModel) treeView() string {
 			if hex, ok := m.statusColors[wp.Status]; ok {
 				colStatus = statusColorStyle(hex).Render(colStatus)
 			}
+			renderedAssignee := normalItemStyle.Render(colAssignee)
+			if hex, ok := m.assigneeHighlights[wp.Assignee]; ok {
+				renderedAssignee = assigneeColorStyle(hex).Render(colAssignee)
+			}
 			fullLine := marker + normalItemStyle.Render(colID) + " " +
 				normalItemStyle.Render(colType) + " " +
 				normalItemStyle.Render(colTitle) + " " +
 				colStatus + " " +
-				normalItemStyle.Render(colAssignee)
+				renderedAssignee
 			b.WriteString(normalItemStyle.Render(prefix) + fullLine)
 		}
 		b.WriteString("\n")

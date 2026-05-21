@@ -62,3 +62,10 @@ func statusColorStyle(hex string) lipgloss.Style {
 	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(hex))
 }
+
+func assigneeColorStyle(hex string) lipgloss.Style {
+	if hex == "" {
+		hex = "#DDD"
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(hex)).Bold(true)
+}
